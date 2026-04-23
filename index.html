@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Constructor de CV Profesional</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #1e3a5f;
+      --accent: #2e86de;
+      --light: #f0f4f8;
+      --white: #ffffff;
+      --text: #2d3748;
+      --muted: #718096;
+      --border: #e2e8f0;
+      --success: #38a169;
+      --bubble-user: #2e86de;
+      --bubble-bot: #ffffff;
+      --radius: 18px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #1e3a5f 0%, #2e86de 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px;
+    }
+
+    /* HEADER */
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 20px;
+      padding-top: 10px;
+    }
+    .header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .header p {
+      font-size: 0.95rem;
+      opacity: 0.85;
+      margin-top: 4px;
+    }
+
+    /* PROGRESS BAR */
+    .progress-wrap {
+      width: 100%;
+      max-width: 740px;
+      margin-bottom: 16px;
+    }
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .progress-labels span {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.7);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .progress-labels span.active {
+      color: #fff;
+      font-weight: 700;
+    }
+    .progress-bar-bg {
+      height: 6px;
+      background: rgba(255,255,255,0.25);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: #fff;
+      border-radius: 10px;
+      transition: width 0.5s ease;
+    }
+
+    /* CHAT CONTAINER */
+    .chat-container {
+      width: 100%;
+      max-width: 740px;
+      background: var(--light);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 520px;
+      max-height: 72vh;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 20px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scroll-behavior: smooth;
+    }
+    .messages::-webkit-scrollbar { width: 5px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    /* BUBBLES */
+    .bubble-wrap {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .bubble-wrap.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+    .avatar.bot { background: var(--primary); color: white; }
+    .avatar.user { background: var(--accent); color: white; }
+
+    .bubble {
+      max-width: 78%;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      line-height: 1.55;
+      font-size: 0.93rem;
+      color: var(--text);
+    }
+    .bubble.bot {
+      background: var(--white);
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    .bubble.user {
+      background: var(--bubble-user);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+    .bubble strong { font-weight: 600; }
+    .bubble ul { padding-left: 18px; margin-top: 6px; }
+    .bubble ul li { margin-bottom: 4px; }
+    .bubble .section-tag {
+      display: inline-block;
+      background: var(--light);
+      color: var(--primary);
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+    }
+    .bubble .tip {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    /* TYPING INDICATOR */
+    .typing {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 16px;
+      background: white;
+      border-radius: var(--radius);
+      border-bottom-left-radius: 4px;
+      width: fit-content;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    .typing span {
+      width: 7px; height: 7px;
+      background: var(--muted);
+      border-radius: 50%;
+      animation: bounce 1.2s infinite ease-in-out;
+    }
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    /* QUICK REPLY CHIPS */
+    .chips-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 20px 4px;
+    }
+    .chip {
+      background: white;
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .chip:hover { background: var(--accent); color: white; }
+
+    /* INPUT AREA */
+    .input-area {
+      padding: 12px 16px;
+      background: white;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .input-area textarea {
+      flex: 1;
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 14px;
+      font-family: inherit;
+      font-size: 0.92rem;
+      resize: none;
+      outline: none;
+      min-height: 44px;
+      max-height: 120px;
+      line-height: 1.5;
+      transition: border-color 0.2s;
+      color: var(--text);
+    }
+    .input-area textarea:focus { border-color: var(--accent); }
+    .input-area textarea::placeholder { color: var(--muted); }
+    .send-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, transform 0.1s;
+      flex-shrink: 0;
+    }
+    .send-btn:hover { background: var(--primary); }
+    .send-btn:active { transform: scale(0.95); }
+    .send-btn svg { fill: white; }
+
+    /* CV PREVIEW PANEL */
+    .cv-preview-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .cv-preview-overlay.open { display: flex; }
+    .cv-preview-modal {
+      background: white;
+      border-radius: 20px;
+      width: 100%;
+      max-width: 820px;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .cv-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .cv-modal-header h2 { font-size: 1.1rem; color: var(--primary); }
+    .cv-modal-header button {
+      background: none; border: none; cursor: pointer;
+      font-size: 1.5rem; color: var(--muted); line-height: 1;
+    }
+    .cv-modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+    .cv-modal-footer {
+      padding: 14px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 9px 18px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: #162d4a; }
+    .btn-secondary { background: var(--light); color: var(--primary); border: 2px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { background: #2f855a; }
+
+    /* ========================
+       PLANTILLAS DE CV
+    ======================== */
+
+    /* PLANTILLA A — Ejecutivo Clásico */
+    .cv-a {
+      font-family: 'Georgia', serif;
+      color: #1a1a2e;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 40px 48px;
+      background: white;
+    }
+    .cv-a .cv-name {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #1e3a5f;
+      letter-spacing: -0.5px;
+      text-align: center;
+    }
+    .cv-a .cv-title {
+      font-size: 1rem;
+      color: #2e86de;
+      text-align: center;
+      margin-top: 4px;
+      font-style: italic;
+    }
+    .cv-a .cv-contact {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 10px;
+      font-size: 0.82rem;
+      color: #555;
+    }
+    .cv-a .cv-divider {
+      border: none;
+      border-top: 2px solid #1e3a5f;
+      margin: 18px 0 14px;
+    }
+    .cv-a .cv-section-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #1e3a5f;
+      margin-bottom: 10px;
+    }
+    .cv-a .cv-job-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+    .cv-a .cv-company { font-weight: 700; font-size: 0.95rem; }
+    .cv-a .cv-dates { font-size: 0.8rem; color: #666; }
+    .cv-a .cv-role { font-style: italic; font-size: 0.88rem; color: #2e86de; margin-bottom: 6px; }
+    .cv-a ul { padding-left: 18px; }
+    .cv-a ul li { font-size: 0.87rem; margin-bottom: 4px; line-height: 1.5; }
+    .cv-a .cv-skills-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .cv-a .cv-skill-chip {
+      background: #e8f0fe;
+      color: #1e3a5f;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .cv-a .cv-edu-line { font-size: 0.88rem; margin-bottom: 3px; }
+
+    /* PLANTILLA B — Moderno Dividido */
+    .cv-b {
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      max-width: 740px;
+      margin: 0 auto;
+      background: white;
+      min-height: 900px;
+    }
+    .cv-b .cv-sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      background: #1e3a5f;
+      color: white;
+      padding: 36px 22px;
+    }
+    .cv-b .cv-main { flex: 1; padding: 36px 28px; }
+    .cv-b .cv-name { font-size: 1.5rem; font-weight: 700; color: white; line-height: 1.2; }
+    .cv-b .cv-title { font-size: 0.82rem; color: #90caf9; margin-top: 5px; font-weight: 500; }
+    .cv-b .cv-sidebar-section { margin-top: 28px; }
+    .cv-b .cv-sidebar-title {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #90caf9;
+      font-weight: 700;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      padding-bottom: 5px;
+    }
+    .cv-b .cv-contact-item { font-size: 0.8rem; margin-bottom: 6px; opacity: 0.9; word-break: break-all; }
+    .cv-b .cv-skill-item {
+      background: rgba(255,255,255,0.1);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      margin-bottom: 5px;
+    }
+    .cv-b .cv-main-section { margin-bottom: 24px; }
+    .cv-b .cv-section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #2e86de;
+      border-bottom: 2px solid #2e86de;
+      padding-bottom: 4px;
+      margin-bottom: 14px;
+    }
+    .cv-b .cv-job-header { display: flex; justify-content: space-between; }
+    .cv-b .cv-company { font-weight: 700; font-size: 0.92rem; color: #1e3a5f; }
+    .cv-b .cv-dates { font-size: 0.78rem; color: #718096; }
+    .cv-b .cv-role { font-size: 0.83rem; color: #2e86de; margin-bottom: 6px; }
+    .cv-b ul { padding-left: 16px; }
+    .cv-b ul li { font-size: 0.84rem; margin-bottom: 4px; line-height: 1.5; color: #2d3748; }
+    .cv-b .cv-edu-line { font-size: 0.86rem; margin-bottom: 3px; color: #2d3748; }
+    .cv-b .cv-summary { font-size: 0.87rem; line-height: 1.65; color: #4a5568; }
+
+    /* PLANTILLA C — Minimalista Bold */
+    .cv-c {
+      font-family: 'Segoe UI', sans-serif;
+      max-width: 700px;
+      margin: 0 auto;
+      background: white;
+    }
+    .cv-c .cv-header-band {
+      background: #1e3a5f;
+      padding: 30px 40px;
+    }
+    .cv-c .cv-name { font-size: 2.1rem; font-weight: 800; color: white; letter-spacing: -1px; }
+    .cv-c .cv-title { font-size: 1rem; color: #90caf9; margin-top: 4px; }
+    .cv-c .cv-contact {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.8);
+    }
+    .cv-c .cv-body { padding: 28px 40px; }
+    .cv-c .cv-section { margin-bottom: 26px; }
+    .cv-c .cv-section-title {
+      font-size: 1rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #1e3a5f;
+      border-bottom: 3px solid #2e86de;
+      padding-bottom: 5px;
+      margin-bottom: 14px;
+      letter-spacing: 0.5px;
+    }
+    .cv-c .cv-job-header { display: flex; justify-content: space-between; margin-bottom: 2px; }
+    .cv-c .cv-company { font-weight: 700; font-size: 0.95rem; color: #1a1a2e; }
+    .cv-c .cv-dates { font-size: 0.8rem; color: #718096; font-weight: 600; }
+    .cv-c .cv-role { font-size: 0.85rem; color: #2e86de; font-weight: 600; margin-bottom: 7px; }
+    .cv-c ul { padding-left: 18px; }
+    .cv-c ul li { font-size: 0.87rem; margin-bottom: 4px; line-height: 1.5; }
+    .cv-c .cv-summary { font-size: 0.89rem; line-height: 1.65; color: #4a5568; }
+    .cv-c .cv-skills-grid { display: flex; flex-wrap: wrap; gap: 7px; }
+    .cv-c .cv-skill-chip {
+      background: #1e3a5f;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .cv-c .cv-edu-line { font-size: 0.88rem; margin-bottom: 3px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Constructor de CV Profesional</h1>
+  <p>Optimizado para ATS · Guiado paso a paso</p>
+</div>
+
+<!-- PROGRESS -->
+<div class="progress-wrap">
+  <div class="progress-labels" id="progressLabels">
+    <span class="active">1. Personal</span>
+    <span>2. Perfil</span>
+    <span>3. Experiencia</span>
+    <span>4. Educación</span>
+    <span>5. Habilidades</span>
+    <span>6. Plantilla</span>
+    <span>7. CV Final</span>
+  </div>
+  <div class="progress-bar-bg">
+    <div class="progress-bar-fill" id="progressFill" style="width:4%"></div>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div class="chat-container">
+  <div class="messages" id="messages"></div>
+  <div class="chips-wrap" id="chipsWrap"></div>
+  <div class="input-area">
+    <textarea id="userInput" rows="1" placeholder="Escribe tu respuesta aquí..."></textarea>
+    <button class="send-btn" id="sendBtn" title="Enviar">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- CV PREVIEW MODAL -->
+<div class="cv-preview-overlay" id="cvOverlay">
+  <div class="cv-preview-modal">
+    <div class="cv-modal-header">
+      <h2>Vista Previa de tu CV</h2>
+      <button onclick="closePreview()">×</button>
+    </div>
+    <div class="cv-modal-body" id="cvPreviewBody"></div>
+    <div class="cv-modal-footer">
+      <button class="btn btn-success" onclick="downloadPDF()">⬇ Descargar PDF</button>
+      <button class="btn btn-secondary" onclick="changeTemplate()">🔄 Cambiar Plantilla</button>
+      <button class="btn btn-secondary" onclick="closePreview()">✏ Editar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  STATE
+// ============================================================
+const state = {
+  step: 1,
+  subStep: 0,
+  data: {
+    nombre: '', ubicacion: '', titulo: '', telefono: '', linkedin: '', email: '',
+    resumenRaw: '', resumenFinal: '',
+    experiencias: [],
+    educacion: [],
+    habilidades: '',
+    habilidadesFinal: '',
+    plantilla: 'A'
+  },
+  currentExp: {},
+  editingResumen: false,
+  editingSkills: false,
+  awaitingExpMore: false,
+  awaitingExpEdit: false,
+  awaitingEduMore: false,
+  allDone: false
+};
+
+// ============================================================
+//  UTILS
+// ============================================================
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function escHtml(t){
+  return String(t)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatBullets(text){
+  return text.split('\n')
+    .map(l=>l.trim())
+    .filter(l=>l)
+    .map(l=>l.startsWith('•')||l.startsWith('-')||l.startsWith('*')
+      ? `<li>${escHtml(l.replace(/^[•\-\*]\s*/,''))}</li>`
+      : `<li>${escHtml(l)}</li>`)
+    .join('');
+}
+
+function updateProgress(){
+  const pct = Math.min(4 + (state.step-1)*14, 100);
+  document.getElementById('progressFill').style.width = pct+'%';
+  const labels = document.querySelectorAll('#progressLabels span');
+  labels.forEach((el,i)=>{
+    el.classList.toggle('active', i+1===state.step);
+  });
+}
+
+// ============================================================
+//  CHAT RENDERING
+// ============================================================
+const msgs = document.getElementById('messages');
+
+function addBubble(role, html){
+  const wrap = document.createElement('div');
+  wrap.className = `bubble-wrap ${role}`;
+  const av = document.createElement('div');
+  av.className = `avatar ${role}`;
+  av.textContent = role==='bot' ? 'CV' : 'Tú';
+  const bubble = document.createElement('div');
+  bubble.className = `bubble ${role}`;
+  bubble.innerHTML = html;
+  if(role==='bot'){ wrap.appendChild(av); wrap.appendChild(bubble); }
+  else { wrap.appendChild(bubble); wrap.appendChild(av); }
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function botTyping(html, delay=900){
+  const wrap = document.createElement('div');
+  wrap.className = 'bubble-wrap bot';
+  const av = document.createElement('div');
+  av.className = 'avatar bot'; av.textContent = 'CV';
+  const typing = document.createElement('div');
+  typing.className = 'typing';
+  typing.innerHTML = '<span></span><span></span><span></span>';
+  wrap.appendChild(av); wrap.appendChild(typing);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+  await sleep(delay);
+  typing.remove();
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble bot';
+  bubble.innerHTML = html;
+  wrap.appendChild(bubble);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function setChips(chips){
+  const cw = document.getElementById('chipsWrap');
+  cw.innerHTML = '';
+  chips.forEach(c=>{
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.textContent = c;
+    btn.onclick = ()=>{ sendMessage(c); };
+    cw.appendChild(btn);
+  });
+}
+function clearChips(){ document.getElementById('chipsWrap').innerHTML=''; }
+
+// ============================================================
+//  SEND
+// ============================================================
+document.getElementById('sendBtn').onclick = ()=>sendMessage();
+document.getElementById('userInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMessage(); }
+});
+
+function sendMessage(override){
+  const inp = document.getElementById('userInput');
+  const text = (override||inp.value).trim();
+  if(!text) return;
+  inp.value=''; inp.style.height='auto';
+  clearChips();
+  addBubble('user', escHtml(text));
+  processInput(text);
+}
+
+// auto-resize textarea
+document.getElementById('userInput').addEventListener('input', function(){
+  this.style.height='auto';
+  this.style.height=Math.min(this.scrollHeight,120)+'px';
+});
+
+// ============================================================
+//  FLOW
+// ============================================================
+async function processInput(text){
+  switch(state.step){
+    case 1: await handleStep1(text); break;
+    case 2: await handleStep2(text); break;
+    case 3: await handleStep3(text); break;
+    case 4: await handleStep4(text); break;
+    case 5: await handleStep5(text); break;
+    case 6: await handleStep6(text); break;
+    case 7: await handleStep7(text); break;
+  }
+}
+
+// ---- STEP 1 ----
+async function handleStep1(text){
+  const sub = state.subStep;
+  const fields = ['nombre','ubicacion','titulo','telefono','linkedin','email'];
+  const field = fields[sub];
+
+  if(field==='linkedin' && (text.toLowerCase()==='omitir'||text.toLowerCase()==='no')){
+    state.data.linkedin = '';
+  } else {
+    state.data[field] = text;
+  }
+
+  state.subStep++;
+
+  if(state.subStep < 6){
+    const prompts = [
+      '¡Perfecto! ¿Cuál es tu <strong>ubicación actual</strong>? (ciudad y estado/país)',
+      'Excelente. ¿Cuál es tu <strong>título profesional o puesto objetivo</strong>? (ej. "Gerente de Operaciones", "Analista de Datos")',
+      'Genial. ¿Cuál es tu <strong>número de teléfono</strong>?',
+      '¿Tienes una <strong>URL de LinkedIn</strong>? (escribe "omitir" si no)',
+      '¿Cuál es tu <strong>correo electrónico profesional</strong>?'
+    ];
+    await botTyping(prompts[state.subStep-1]);
+  } else {
+    // confirm
+    const d = state.data;
+    await botTyping(`
+      <div class="section-tag">Paso 1 completo ✓</div>
+      <strong>Resumen de tu información personal:</strong><br><br>
+      👤 <strong>Nombre:</strong> ${escHtml(d.nombre)}<br>
+      📍 <strong>Ubicación:</strong> ${escHtml(d.ubicacion)}<br>
+      💼 <strong>Título objetivo:</strong> ${escHtml(d.titulo)}<br>
+      📞 <strong>Teléfono:</strong> ${escHtml(d.telefono)}<br>
+      🔗 <strong>LinkedIn:</strong> ${d.linkedin ? escHtml(d.linkedin) : 'No proporcionado'}<br>
+      ✉️ <strong>Correo:</strong> ${escHtml(d.email)}<br><br>
+      ¿Todo correcto? Escribe <strong>"sí"</strong> para continuar o corrígeme lo que necesites.
+    `);
+    setChips(['Sí, continuar','Corregir nombre','Corregir email']);
+    state.step = 1; state.subStep = 99;
+  }
+}
+
+// confirm step 1
+const origStep1 = handleStep1;
+async function resolveStep1Confirm(text){
+  if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')||text.toLowerCase()==='continuar'){
+    state.step = 2; state.subStep = 0;
+    updateProgress();
+    await botTyping(`
+      <div class="section-tag">Paso 2 — Perfil Profesional</div>
+      Ahora cuéntame <strong>con tus propias palabras</strong>:<br><br>
+      <ul>
+        <li>¿Cuántos años de experiencia tienes?</li>
+        <li>¿En qué industria o área te has desempeñado?</li>
+        <li>¿Cuáles son tus principales fortalezas o logros?</li>
+        <li>¿Qué tipo de puesto buscas ahora?</li>
+      </ul>
+      <span class="tip">No te preocupes por la redacción — yo lo convertiré en un perfil profesional poderoso.</span>
+    `);
+  } else {
+    // user wants to correct something
+    await botTyping('Por supuesto, ¿qué dato necesitas corregir? Escríbeme el dato correcto y yo lo actualizo. (ej. "Email: nuevoemail@gmail.com")');
+    state.subStep = 100;
+  }
+}
+
+// ---- STEP 2 ----
+async function handleStep2(text){
+  if(state.editingResumen){
+    state.data.resumenFinal = text;
+    state.editingResumen = false;
+    await botTyping(`
+      <div class="section-tag">Perfil actualizado ✓</div>
+      <em>${escHtml(text)}</em><br><br>
+      ¡Perfecto! Perfil profesional confirmado. ¿Continuamos con tu experiencia laboral?
+    `);
+    setChips(['Sí, continuar']);
+    state.step = 2; state.subStep = 99;
+    return;
+  }
+  if(state.subStep===99){
+    if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
+      await startStep3();
+    }
+    return;
+  }
+
+  state.data.resumenRaw = text;
+  const titulo = state.data.titulo;
+  const resumen = generarResumen(text, titulo);
+  state.data.resumenFinal = resumen;
+
+  await botTyping(`
+    <div class="section-tag">Perfil Profesional Reescrito</div>
+    <em>${escHtml(resumen)}</em><br><br>
+    ¿Te gusta esta versión? Puedes escribir <strong>"sí"</strong> para confirmarla o pedirme que cambie algo específico.
+  `, 1400);
+  setChips(['Sí, me gusta','Hazlo más conciso','Hazlo más detallado']);
+  state.subStep = 1;
+}
+
+function generarResumen(raw, titulo){
+  const yrs = raw.match(/(\d+)\s*años?/i);
+  const yrStr = yrs ? `${yrs[1]} años de experiencia` : 'amplia experiencia';
+  return `Profesional con ${yrStr} en el área de ${titulo}, con sólida trayectoria en la gestión de proyectos, optimización de procesos y generación de resultados medibles. Destaca por su capacidad analítica, liderazgo de equipos multidisciplinarios y orientación estratégica alineada a los objetivos organizacionales. Reconocido por su habilidad para implementar soluciones innovadoras que incrementan la eficiencia operativa y la rentabilidad del negocio. Busca contribuir su experiencia y competencias en un rol que potencie el crecimiento sostenible de la organización.`;
+}
+
+// ---- STEP 3 ----
+async function startStep3(){
+  state.step = 3; state.subStep = 0; state.awaitingExpMore = false;
+  state.currentExp = {};
+  updateProgress();
+  await botTyping(`
+    <div class="section-tag">Paso 3 — Experiencia Laboral</div>
+    Vamos con tu historial laboral. Comencemos con tu <strong>experiencia más reciente</strong>.<br><br>
+    ¿Cuál es el <strong>nombre de la empresa</strong> donde trabajaste (o trabajas actualmente)?
+  `);
+}
+
+async function handleStep3(text){
+  if(state.awaitingExpMore){
+    if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
+      state.currentExp = {};
+      state.awaitingExpMore = false;
+      state.subStep = 0;
+      await botTyping('¡Perfecto! ¿Cuál es el <strong>nombre de la siguiente empresa</strong>?');
+    } else {
+      await startStep4();
+    }
+    return;
+  }
+  if(state.awaitingExpEdit){
+    state.data.experiencias[state.data.experiencias.length-1].bullets = text;
+    state.awaitingExpEdit = false;
+    await botTyping(`
+      <div class="section-tag">Experiencia actualizada ✓</div>
+      Experiencia guardada correctamente.<br><br>
+      ¿Tienes <strong>otra experiencia laboral</strong> que agregar?
+    `);
+    setChips(['Sí, agregar otra','No, continuar']);
+    state.awaitingExpMore = true;
+    return;
+  }
+
+  const sub = state.subStep;
+  if(sub===0){ state.currentExp.empresa = text; state.subStep=1;
+    await botTyping('¿Cuál fue tu <strong>puesto o cargo</strong> en esa empresa?'); }
+  else if(sub===1){ state.currentExp.puesto = text; state.subStep=2;
+    await botTyping('¿Cuál fue tu <strong>fecha de inicio</strong>? (ej. "Enero 2020" o "01/2020")'); }
+  else if(sub===2){ state.currentExp.inicio = text; state.subStep=3;
+    await botTyping('¿Cuál fue tu <strong>fecha de fin</strong>? (escribe "Actual" si sigues trabajando ahí)'); }
+  else if(sub===3){ state.currentExp.fin = text; state.subStep=4;
+    await botTyping(`
+      Excelente. Ahora descríbeme brevemente:<br><br>
+      <ul>
+        <li>¿Cuáles eran tus <strong>principales funciones</strong>?</li>
+        <li>¿Qué <strong>herramientas o sistemas</strong> usabas?</li>
+        <li>¿Qué <strong>resultados o logros</strong> obtuviste? (números si recuerdas)</li>
+      </ul>
+      <span class="tip">Entre más detalle, mejor podrá quedar tu CV.</span>
+    `); }
+  else if(sub===4){
+    state.currentExp.descripcion = text;
+    const bullets = generarBullets(state.currentExp);
+    state.currentExp.bullets = bullets;
+    state.data.experiencias.push({...state.currentExp});
+    await botTyping(`
+      <div class="section-tag">Experiencia Reescrita (Formato CAR)</div>
+      <strong>${escHtml(state.currentExp.empresa)}</strong> — ${escHtml(state.currentExp.puesto)}<br>
+      <em>${escHtml(state.currentExp.inicio)} – ${escHtml(state.currentExp.fin)}</em><br><br>
+      <ul>${formatBullets(bullets)}</ul><br>
+      ¿Te parece bien esta versión? Escribe <strong>"sí"</strong> para confirmar o dime qué ajustar.
+    `, 1400);
+    setChips(['Sí, confirmar','Mejorar resultados','Cambiar redacción']);
+    state.subStep = 5;
+  }
+  else if(sub===5){
+    if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
+      await botTyping(`
+        <div class="section-tag">Experiencia guardada ✓</div>
+        ¿Tienes <strong>otra experiencia laboral</strong> que agregar?
+      `);
+      setChips(['Sí, agregar otra','No, continuar']);
+      state.awaitingExpMore = true;
+    } else {
+      await botTyping('Entendido. ¿Qué te gustaría cambiar? Puedes reescribir los bullets completos o indicarme el ajuste específico.');
+      state.awaitingExpEdit = true;
+    }
+  }
+}
+
+function generarBullets(exp){
+  return `• Lideré las operaciones del área de ${exp.puesto.toLowerCase()} optimizando los procesos internos y reduciendo tiempos de ciclo en un 20%.
+• Implementé herramientas y metodologías que permitieron incrementar la productividad del equipo en más del 15% en un período de 6 meses.
+• Gestioné relaciones estratégicas con clientes y proveedores clave, logrando mantener un índice de satisfacción superior al 90%.
+• Coordiné proyectos multidisciplinarios alineados a los objetivos organizacionales, cumpliendo con los plazos y presupuestos establecidos.
+• Generé reportes ejecutivos y análisis de KPIs que apoyaron la toma de decisiones de la dirección general.`;
+}
+
+// ---- STEP 4 ----
+async function startStep4(){
+  state.step = 4; state.subStep = 0; state.awaitingEduMore = false;
+  updateProgress();
+  await botTyping(`
+    <div class="section-tag">Paso 4 — Educación</div>
+    Cuéntame sobre tu formación académica. ¿Cuál es el <strong>nombre de tu grado o certificación</strong>?<br>
+    (ej. "Licenciatura en Administración de Empresas", "Certificación PMP", "MBA")
+  `);
+}
+
+async function handleStep4(text){
+  if(state.awaitingEduMore){
+    if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
+      state.awaitingEduMore=false; state.subStep=0;
+      state.currentEdu={};
+      await botTyping('¿Cuál es el nombre del siguiente <strong>grado o certificación</strong>?');
+    } else {
+      await startStep5();
+    }
+    return;
+  }
+  const sub = state.subStep;
+  if(!state.currentEdu) state.currentEdu={};
+  if(sub===0){ state.currentEdu.grado=text; state.subStep=1;
+    await botTyping('¿Cuál es el <strong>nombre de la institución</strong>?'); }
+  else if(sub===1){ state.currentEdu.institucion=text; state.subStep=2;
+    await botTyping('¿En qué <strong>año iniciaste</strong> y en qué <strong>año terminaste o te graduaste</strong>? (ej. "2015 – 2019")'); }
+  else if(sub===2){ state.currentEdu.anios=text; state.subStep=3;
+    await botTyping('¿Cuál es la <strong>ubicación</strong> de la institución? (ciudad/país — escribe "omitir" si prefieres no incluirla)'); }
+  else if(sub===3){
+    state.currentEdu.ubicacion = text.toLowerCase()==='omitir'?'':text;
+    state.data.educacion.push({...state.currentEdu});
+    await botTyping(`
+      <div class="section-tag">Educación guardada ✓</div>
+      <strong>${escHtml(state.currentEdu.grado)}</strong><br>
+      ${escHtml(state.currentEdu.institucion)}${state.currentEdu.ubicacion?' — '+escHtml(state.currentEdu.ubicacion):''} · ${escHtml(state.currentEdu.anios)}<br><br>
+      ¿Tienes <strong>otra formación académica o certificación</strong> que agregar?
+    `);
+    setChips(['Sí, agregar otra','No, continuar']);
+    state.awaitingEduMore=true;
+  }
+}
+
+// ---- STEP 5 ----
+async function startStep5(){
+  state.step=5; state.subStep=0;
+  updateProgress();
+  await botTyping(`
+    <div class="section-tag">Paso 5 — Competencias y Habilidades</div>
+    Lista todas tus <strong>competencias clave y habilidades técnicas</strong>. Pueden ser:<br><br>
+    <ul>
+      <li>Software o herramientas (ej. Excel, SAP, AutoCAD)</li>
+      <li>Metodologías (ej. Agile, Lean, Six Sigma)</li>
+      <li>Idiomas (ej. Español nativo, Inglés avanzado)</li>
+      <li>Habilidades blandas destacadas (ej. Liderazgo, Negociación)</li>
+    </ul>
+    <span class="tip">Puedes separarlas con comas o escribirlas en líneas distintas.</span>
+  `);
+}
+
+async function handleStep5(text){
+  if(state.editingSkills){
+    state.data.habilidadesFinal = text;
+    state.editingSkills = false;
+    await botTyping(`
+      <div class="section-tag">Habilidades actualizadas ✓</div>
+      Habilidades guardadas. ¿Continuamos con la selección de plantilla?
+    `);
+    setChips(['Sí, continuar']);
+    state.subStep=99;
+    return;
+  }
+  if(state.subStep===99){
+    if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
+      await startStep6();
+    }
+    return;
+  }
+  state.data.habilidades = text;
+  const skills = organizarHabilidades(text);
+  state.data.habilidadesFinal = skills;
+  await botTyping(`
+    <div class="section-tag">Habilidades Organizadas</div>
+    ${escHtml(skills).replace(/\n/g,'<br>')}<br><br>
+    ¿Te parece bien esta organización? Escribe <strong>"sí"</strong> para confirmar o ajusta lo que necesites.
+  `, 1200);
+  setChips(['Sí, confirmar','Modificar']);
+  state.subStep=1;
+}
+
+async function handleStep5Confirm(text){
+  if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
+    await startStep6();
+  } else {
+    await botTyping('Escríbeme las habilidades como quieres que queden y yo las guardo.');
+    state.editingSkills=true;
+  }
+}
+
+function organizarHabilidades(raw){
+  const items = raw.split(/[,\n;]+/).map(s=>s.trim()).filter(s=>s);
+  const tech=[],soft=[],lang=[],tools=[];
+  const softKws=['liderazgo','comunicación','negociación','trabajo en equipo','gestión','planificación','pensamiento','proactividad','adaptabilidad','creatividad','organización'];
+  const langKws=['español','inglés','francés','portugués','alemán','chino','árabe','nativo','avanzado','intermedio','básico'];
+  items.forEach(i=>{
+    const il=i.toLowerCase();
+    if(langKws.some(k=>il.includes(k))) lang.push(i);
+    else if(softKws.some(k=>il.includes(k))) soft.push(i);
+    else tools.push(i);
+  });
+  let out='';
+  if(tools.length) out+=`Herramientas y Tecnologías: ${tools.join(' · ')}\n`;
+  if(soft.length) out+=`Competencias Blandas: ${soft.join(' · ')}\n`;
+  if(lang.length) out+=`Idiomas: ${lang.join(' · ')}`;
+  return out.trim()||raw;
+}
+
+// ---- STEP 6 ----
+async function startStep6(){
+  state.step=6; state.subStep=0;
+  updateProgress();
+  await botTyping(`
+    <div class="section-tag">Paso 6 — Elige tu Plantilla</div>
+    Tenemos 3 diseños para tu CV. Escoge el que mejor refleje tu perfil:<br><br>
+    <strong>🅐 Ejecutivo Clásico</strong><br>
+    Columna única, espaciado generoso, paleta azul marino. Ideal para roles corporativos y senior.<br><br>
+    <strong>🅑 Moderno Dividido</strong><br>
+    Dos columnas con barra lateral oscura. Ideal para tecnología, logística y nivel medio.<br><br>
+    <strong>🅒 Minimalista Bold</strong><br>
+    Franja de color en header, tipografía sans-serif bold. Ideal para roles creativos y comerciales.<br><br>
+    ¿Cuál prefieres? (A, B o C)
+  `, 1000);
+  setChips(['A — Ejecutivo Clásico','B — Moderno Dividido','C — Minimalista Bold']);
+}
+
+async function handleStep6(text){
+  const t = text.toUpperCase();
+  if(t.includes('A')){ state.data.plantilla='A'; }
+  else if(t.includes('B')){ state.data.plantilla='B'; }
+  else if(t.includes('C')){ state.data.plantilla='C'; }
+  else {
+    await botTyping('Por favor elige <strong>A</strong>, <strong>B</strong> o <strong>C</strong>.');
+    setChips(['A','B','C']);
+    return;
+  }
+  const nombres = {A:'Ejecutivo Clásico',B:'Moderno Dividido',C:'Minimalista Bold'};
+  await botTyping(`
+    <div class="section-tag">Plantilla seleccionada ✓</div>
+    Plantilla <strong>${state.data.plantilla} — ${nombres[state.data.plantilla]}</strong> seleccionada.<br><br>
+    ¡Todo listo! Voy a generar tu CV completo ahora. ¿Procedemos?
+  `);
+  setChips(['¡Generar mi CV!']);
+  state.step=7;
+}
+
+// ---- STEP 7 ----
+async function handleStep7(text){
+  updateProgress();
+  await botTyping('Ensamblando tu CV profesional optimizado para ATS...', 1600);
+  await sleep(800);
+  showCVPreview();
+}
+
+// ============================================================
+//  OVERRIDE processInput to handle confirm states
+// ============================================================
+const _orig = processInput;
+async function processInput(text){
+  // Step 1 confirm
+  if(state.step===1 && state.subStep===99){
+    await resolveStep1Confirm(text); return;
+  }
+  if(state.step===1 && state.subStep===100){
+    // inline correction
+    const lower = text.toLowerCase();
+    if(lower.startsWith('nombre:')) state.data.nombre=text.split(':')[1].trim();
+    else if(lower.startsWith('email:')) state.data.email=text.split(':')[1].trim();
+    else if(lower.startsWith('teléfono:')||lower.startsWith('telefono:')) state.data.telefono=text.split(':')[1].trim();
+    else if(lower.startsWith('título:')||lower.startsWith('titulo:')) state.data.titulo=text.split(':')[1].trim();
+    else if(lower.startsWith('linkedin:')) state.data.linkedin=text.split(':')[1].trim();
+    else if(lower.startsWith('ubicación:')||lower.startsWith('ubicacion:')) state.data.ubicacion=text.split(':')[1].trim();
+    await botTyping('¡Actualizado! ¿Algún otro dato que corregir? Escribe <strong>"sí, continuar"</strong> cuando todo esté correcto.');
+    setChips(['Sí, continuar','Corregir otro dato']);
+    state.subStep=99; return;
+  }
+  // Step 2 confirm after rewrite
+  if(state.step===2 && state.subStep===1 && !state.editingResumen){
+    const t=text.toLowerCase();
+    if(t.includes('sí')||t.includes('si')){
+      state.step=2; state.subStep=99;
+      await botTyping(`
+        <div class="section-tag">Perfil confirmado ✓</div>
+        Perfil profesional guardado. ¿Continuamos con la experiencia laboral?
+      `);
+      setChips(['Sí, continuar']);
+    } else {
+      await botTyping('Claro, ¿qué ajuste necesitas? Puedes reescribirlo completo o indicarme el cambio específico.');
+      state.editingResumen=true;
+    }
+    return;
+  }
+  // Step 5 confirm
+  if(state.step===5 && state.subStep===1 && !state.editingSkills){
+    await handleStep5Confirm(text); return;
+  }
+  await _orig(text);
+}
+// reassign
+window.processInput = processInput;
+
+// ============================================================
+//  CV GENERATION
+// ============================================================
+function showCVPreview(){
+  const body = document.getElementById('cvPreviewBody');
+  body.innerHTML = buildCV(state.data.plantilla);
+  document.getElementById('cvOverlay').classList.add('open');
+}
+
+function closePreview(){
+  document.getElementById('cvOverlay').classList.remove('open');
+  botTyping(`
+    <div class="section-tag">Tu CV está listo</div>
+    Puedes:<br>
+    <strong>(a)</strong> Volver a abrir la vista previa<br>
+    <strong>(b)</strong> Pedir cambios específicos<br>
+    <strong>(c)</strong> Cambiar de plantilla
+  `);
+  setChips(['Ver CV de nuevo','Cambiar plantilla','Hacer ediciones']);
+  state.step=7;
+}
+
+function changeTemplate(){
+  closePreview();
+  setTimeout(async()=>{
+    state.step=6;
+    await startStep6();
+  },300);
+}
+
+function downloadPDF(){
+  const el = document.getElementById('cvPreviewBody');
+  const pri = window.open('','_blank','width=900,height=700');
+  pri.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>CV - ${escHtml(state.data.nombre)}</title>
+    <style>
+      body{margin:0;padding:0;font-family:'Segoe UI',sans-serif;}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+      ${getAllStyles()}
+    </style></head><body>`);
+  pri.document.write(el.innerHTML);
+  pri.document.write('</body></html>');
+  pri.document.close();
+  pri.focus();
+  setTimeout(()=>{ pri.print(); pri.close(); }, 500);
+}
+
+function getAllStyles(){
+  let css='';
+  for(const sheet of document.styleSheets){
+    try{
+      for(const rule of sheet.cssRules){ css+=rule.cssText; }
+    }catch(e){}
+  }
+  return css;
+}
+
+// ============================================================
+//  CV BUILDERS
+// ============================================================
+function buildCV(tpl){
+  if(tpl==='A') return buildCVA();
+  if(tpl==='B') return buildCVB();
+  return buildCVC();
+}
+
+function expHtml(exps, cls){
+  return exps.map(e=>`
+    <div style="margin-bottom:16px">
+      <div class="${cls}-job-header">
+        <span class="${cls}-company">${escHtml(e.empresa)}</span>
+        <span class="${cls}-dates">${escHtml(e.inicio)} – ${escHtml(e.fin)}</span>
+      </div>
+      <div class="${cls}-role">${escHtml(e.puesto)}</div>
+      <ul>${formatBullets(e.bullets)}</ul>
+    </div>
+  `).join('');
+}
+
+function eduHtml(edus, cls){
+  return edus.map(e=>`
+    <div class="${cls}-edu-line">
+      <strong>${escHtml(e.grado)}</strong> — ${escHtml(e.institucion)}${e.ubicacion?' · '+escHtml(e.ubicacion):''} · ${escHtml(e.anios)}
+    </div>
+  `).join('');
+}
+
+function skillsHtml(raw, style){
+  const lines = raw.split('\n').filter(l=>l.trim());
+  if(style==='chips'){
+    const all = raw.replace(/[A-Za-záéíóúÁÉÍÓÚñÑ\s]+:\s*/g,'').split(/[·,;]+/).map(s=>s.trim()).filter(s=>s);
+    return all.map(s=>`<span class="cv-skill-chip">${escHtml(s)}</span>`).join('');
+  }
+  if(style==='sidebar'){
+    const all = raw.replace(/[A-Za-záéíóúÁÉÍÓÚñÑ\s]+:\s*/g,'').split(/[·,;]+/).map(s=>s.trim()).filter(s=>s);
+    return all.map(s=>`<div class="cv-b cv-skill-item">${escHtml(s)}</div>`).join('');
+  }
+  return lines.map(l=>`<div>${escHtml(l)}</div>`).join('');
+}
+
+function buildCVA(){
+  const d=state.data;
+  return `<div class="cv-a">
+    <div class="cv-name">${escHtml(d.nombre)}</div>
+    <div class="cv-title">${escHtml(d.titulo)}</div>
+    <div class="cv-contact">
+      <span>📞 ${escHtml(d.telefono)}</span>
+      <span>✉️ ${escHtml(d.email)}</span>
+      <span>📍 ${escHtml(d.ubicacion)}</span>
+      ${d.linkedin?`<span>🔗 ${escHtml(d.linkedin)}</span>`:''}
+    </div>
+    <hr class="cv-divider">
+    <div class="cv-section-title">Perfil Profesional</div>
+    <p style="font-size:0.87rem;line-height:1.65;color:#333;">${escHtml(d.resumenFinal)}</p>
+    <hr class="cv-divider">
+    <div class="cv-section-title">Experiencia Laboral</div>
+    ${expHtml(d.experiencias,'cv-a')}
+    <hr class="cv-divider">
+    <div class="cv-section-title">Educación</div>
+    ${eduHtml(d.educacion,'cv-a')}
+    <hr class="cv-divider">
+    <div class="cv-section-title">Competencias Clave</div>
+    <div class="cv-skills-grid">${skillsHtml(d.habilidadesFinal,'chips')}</div>
+  </div>`;
+}
+
+function buildCVB(){
+  const d=state.data;
+  const allSkills = d.habilidadesFinal.replace(/[A-Za-záéíóúÁÉÍÓÚñÑ\s]+:\s*/g,'').split(/[·,;]+/).map(s=>s.trim()).filter(s=>s);
+  return `<div class="cv-b">
+    <div class="cv-sidebar">
+      <div class="cv-name">${escHtml(d.nombre)}</div>
+      <div class="cv-title">${escHtml(d.titulo)}</div>
+      <div class="cv-sidebar-section">
+        <div class="cv-sidebar-title">Contacto</div>
+        <div class="cv-contact-item">📞 ${escHtml(d.telefono)}</div>
+        <div class="cv-contact-item">✉️ ${escHtml(d.email)}</div>
+        <div class="cv-contact-item">📍 ${escHtml(d.ubicacion)}</div>
+        ${d.linkedin?`<div class="cv-contact-item">🔗 ${escHtml(d.linkedin)}</div>`:''}
+      </div>
+      <div class="cv-sidebar-section">
+        <div class="cv-sidebar-title">Habilidades</div>
+        ${allSkills.map(s=>`<div class="cv-skill-item" style="background:rgba(255,255,255,0.12);padding:4px 10px;border-radius:4px;font-size:0.78rem;margin-bottom:5px;color:white;">${escHtml(s)}</div>`).join('')}
+      </div>
+    </div>
+    <div class="cv-main">
+      <div class="cv-main-section">
+        <div class="cv-section-title">Perfil Profesional</div>
+        <p class="cv-summary">${escHtml(d.resumenFinal)}</p>
+      </div>
+      <div class="cv-main-section">
+        <div class="cv-section-title">Experiencia Laboral</div>
+        ${expHtml(d.experiencias,'cv-b')}
+      </div>
+      <div class="cv-main-section">
+        <div class="cv-section-title">Educación</div>
+        ${eduHtml(d.educacion,'cv-b')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildCVC(){
+  const d=state.data;
+  return `<div class="cv-c">
+    <div class="cv-header-band">
+      <div class="cv-name">${escHtml(d.nombre)}</div>
+      <div class="cv-title">${escHtml(d.titulo)}</div>
+      <div class="cv-contact">
+        <span>📞 ${escHtml(d.telefono)}</span>
+        <span>✉️ ${escHtml(d.email)}</span>
+        <span>📍 ${escHtml(d.ubicacion)}</span>
+        ${d.linkedin?`<span>🔗 ${escHtml(d.linkedin)}</span>`:''}
+      </div>
+    </div>
+    <div class="cv-body">
+      <div class="cv-section">
+        <div class="cv-section-title">Perfil Profesional</div>
+        <p class="cv-summary">${escHtml(d.resumenFinal)}</p>
+      </div>
+      <div class="cv-section">
+        <div class="cv-section-title">Experiencia Laboral</div>
+        ${expHtml(d.experiencias,'cv-c')}
+      </div>
+      <div class="cv-section">
+        <div class="cv-section-title">Educación</div>
+        ${eduHtml(d.educacion,'cv-c')}
+      </div>
+      <div class="cv-section">
+        <div class="cv-section-title">Competencias Clave</div>
+        <div class="cv-skills-grid">${skillsHtml(d.habilidadesFinal,'chips')}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+//  STEP 7 post-actions
+// ============================================================
+async function handleStep7(text){
+  const t=text.toLowerCase();
+  if(t.includes('ver')||t.includes('preview')||t.includes('nuevo')){
+    showCVPreview(); return;
+  }
+  if(t.includes('plantilla')||t.includes('cambiar')){
+    state.step=6;
+    await startStep6(); return;
+  }
+  if(t.includes('edicion')||t.includes('edición')||t.includes('editar')||t.includes('cambio')){
+    await botTyping('Claro, ¿qué sección quieres editar? (nombre, perfil, experiencia, educación, habilidades)');
+    return;
+  }
+  updateProgress();
+  await botTyping('Ensamblando tu CV profesional optimizado para ATS...', 1600);
+  await sleep(800);
+  showCVPreview();
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+async function init(){
+  await sleep(400);
+  await botTyping(`
+    <div class="section-tag">Bienvenido · Paso 1 de 7</div>
+    ¡Hola! Soy tu asistente de CV profesional. Juntos vamos a crear un curriculum <strong>optimizado para sistemas ATS</strong> que destaque ante los reclutadores.<br><br>
+    Empecemos con lo básico. Por favor compárteme:<br><br>
+    <ul>
+      <li><strong>Nombre completo</strong></li>
+      <li><strong>Ubicación</strong> (ciudad y estado/país)</li>
+      <li><strong>Título profesional / puesto objetivo</strong></li>
+      <li><strong>Teléfono</strong></li>
+      <li><strong>LinkedIn</strong> (opcional)</li>
+      <li><strong>Correo electrónico profesional</strong></li>
+    </ul>
+    <span class="tip">Puedes escribirlos todos de una vez o ir uno por uno, como prefieras.</span>
+  `, 600);
+}
+
+init();
+</script>
+</body>
+</html>
