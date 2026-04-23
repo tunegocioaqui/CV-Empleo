@@ -555,27 +555,20 @@
 
 <script>
 // ============================================================
-//  STATE
+//  STATE  — "mode" drives the entire flow (no duplicate fns)
 // ============================================================
 const state = {
-  step: 1,
-  subStep: 0,
+  mode: 'p1_nombre',   // current waiting mode
   data: {
-    nombre: '', ubicacion: '', titulo: '', telefono: '', linkedin: '', email: '',
-    resumenRaw: '', resumenFinal: '',
-    experiencias: [],
-    educacion: [],
-    habilidades: '',
-    habilidadesFinal: '',
-    plantilla: 'A'
+    nombre:'', ubicacion:'', titulo:'', telefono:'', linkedin:'', email:'',
+    resumenFinal:'',
+    experiencias:[],
+    educacion:[],
+    habilidadesFinal:'',
+    plantilla:'A'
   },
   currentExp: {},
-  editingResumen: false,
-  editingSkills: false,
-  awaitingExpMore: false,
-  awaitingExpEdit: false,
-  awaitingEduMore: false,
-  allDone: false
+  currentEdu: {}
 };
 
 // ============================================================
@@ -590,20 +583,27 @@ function escHtml(t){
 
 function formatBullets(text){
   return text.split('\n')
-    .map(l=>l.trim())
-    .filter(l=>l)
-    .map(l=>l.startsWith('•')||l.startsWith('-')||l.startsWith('*')
-      ? `<li>${escHtml(l.replace(/^[•\-\*]\s*/,''))}</li>`
-      : `<li>${escHtml(l)}</li>`)
+    .map(l=>l.trim()).filter(l=>l)
+    .map(l=>`<li>${escHtml(l.replace(/^[•\-\*]\s*/,''))}</li>`)
     .join('');
 }
 
+const STEP_MAP = {
+  p1_nombre:1, p1_ubicacion:1, p1_titulo:1, p1_telefono:1, p1_linkedin:1, p1_email:1, p1_confirm:1, p1_fix:1,
+  p2_raw:2, p2_confirm:2, p2_edit:2,
+  p3_empresa:3, p3_puesto:3, p3_inicio:3, p3_fin:3, p3_desc:3, p3_confirm:3, p3_edit:3, p3_more:3,
+  p4_grado:4, p4_institucion:4, p4_anios:4, p4_ubicacion:4, p4_more:4,
+  p5_raw:5, p5_confirm:5, p5_edit:5,
+  p6_plantilla:6,
+  p7_done:7
+};
+
 function updateProgress(){
-  const pct = Math.min(4 + (state.step-1)*14, 100);
+  const step = STEP_MAP[state.mode] || 1;
+  const pct = Math.min(4 + (step-1)*14, 100);
   document.getElementById('progressFill').style.width = pct+'%';
-  const labels = document.querySelectorAll('#progressLabels span');
-  labels.forEach((el,i)=>{
-    el.classList.toggle('active', i+1===state.step);
+  document.querySelectorAll('#progressLabels span').forEach((el,i)=>{
+    el.classList.toggle('active', i+1===step);
   });
 }
 
@@ -614,32 +614,35 @@ const msgs = document.getElementById('messages');
 
 function addBubble(role, html){
   const wrap = document.createElement('div');
-  wrap.className = `bubble-wrap ${role}`;
+  wrap.className = 'bubble-wrap ' + role;
   const av = document.createElement('div');
-  av.className = `avatar ${role}`;
-  av.textContent = role==='bot' ? 'CV' : 'Tú';
+  av.className = 'avatar ' + role;
+  av.textContent = role === 'bot' ? 'CV' : 'Tú';
   const bubble = document.createElement('div');
-  bubble.className = `bubble ${role}`;
+  bubble.className = 'bubble ' + role;
   bubble.innerHTML = html;
-  if(role==='bot'){ wrap.appendChild(av); wrap.appendChild(bubble); }
+  if(role === 'bot'){ wrap.appendChild(av); wrap.appendChild(bubble); }
   else { wrap.appendChild(bubble); wrap.appendChild(av); }
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-async function botTyping(html, delay=900){
+async function botTyping(html, delay){
+  if(delay === undefined) delay = 800;
   const wrap = document.createElement('div');
   wrap.className = 'bubble-wrap bot';
   const av = document.createElement('div');
-  av.className = 'avatar bot'; av.textContent = 'CV';
+  av.className = 'avatar bot';
+  av.textContent = 'CV';
   const typing = document.createElement('div');
   typing.className = 'typing';
   typing.innerHTML = '<span></span><span></span><span></span>';
-  wrap.appendChild(av); wrap.appendChild(typing);
+  wrap.appendChild(av);
+  wrap.appendChild(typing);
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
   await sleep(delay);
-  typing.remove();
+  wrap.removeChild(typing);
   const bubble = document.createElement('div');
   bubble.className = 'bubble bot';
   bubble.innerHTML = html;
@@ -650,702 +653,553 @@ async function botTyping(html, delay=900){
 function setChips(chips){
   const cw = document.getElementById('chipsWrap');
   cw.innerHTML = '';
-  chips.forEach(c=>{
+  chips.forEach(function(c){
     const btn = document.createElement('button');
     btn.className = 'chip';
     btn.textContent = c;
-    btn.onclick = ()=>{ sendMessage(c); };
+    btn.addEventListener('click', function(){ sendMessage(c); });
     cw.appendChild(btn);
   });
 }
-function clearChips(){ document.getElementById('chipsWrap').innerHTML=''; }
+
+function clearChips(){ document.getElementById('chipsWrap').innerHTML = ''; }
 
 // ============================================================
 //  SEND
 // ============================================================
-document.getElementById('sendBtn').onclick = ()=>sendMessage();
-document.getElementById('userInput').addEventListener('keydown', e=>{
-  if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMessage(); }
+document.getElementById('sendBtn').addEventListener('click', function(){ sendMessage(); });
+document.getElementById('userInput').addEventListener('keydown', function(e){
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+});
+document.getElementById('userInput').addEventListener('input', function(){
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
 });
 
 function sendMessage(override){
   const inp = document.getElementById('userInput');
-  const text = (override||inp.value).trim();
+  const text = (override || inp.value).trim();
   if(!text) return;
-  inp.value=''; inp.style.height='auto';
+  inp.value = '';
+  inp.style.height = 'auto';
   clearChips();
   addBubble('user', escHtml(text));
-  processInput(text);
+  handleInput(text);
 }
-
-// auto-resize textarea
-document.getElementById('userInput').addEventListener('input', function(){
-  this.style.height='auto';
-  this.style.height=Math.min(this.scrollHeight,120)+'px';
-});
 
 // ============================================================
-//  FLOW
+//  SINGLE FLOW HANDLER  (mode-based state machine)
 // ============================================================
-async function processInput(text){
-  switch(state.step){
-    case 1: await handleStep1(text); break;
-    case 2: await handleStep2(text); break;
-    case 3: await handleStep3(text); break;
-    case 4: await handleStep4(text); break;
-    case 5: await handleStep5(text); break;
-    case 6: await handleStep6(text); break;
-    case 7: await handleStep7(text); break;
-  }
-}
+async function handleInput(text){
+  const t = text.toLowerCase().trim();
+  const yes = t.includes('sí') || t.includes('si') || t === 'continuar' || t === 'confirmar';
 
-// ---- STEP 1 ----
-async function handleStep1(text){
-  const sub = state.subStep;
-  const fields = ['nombre','ubicacion','titulo','telefono','linkedin','email'];
-  const field = fields[sub];
-
-  if(field==='linkedin' && (text.toLowerCase()==='omitir'||text.toLowerCase()==='no')){
-    state.data.linkedin = '';
-  } else {
-    state.data[field] = text;
-  }
-
-  state.subStep++;
-
-  if(state.subStep < 6){
-    const prompts = [
-      '¡Perfecto! ¿Cuál es tu <strong>ubicación actual</strong>? (ciudad y estado/país)',
-      'Excelente. ¿Cuál es tu <strong>título profesional o puesto objetivo</strong>? (ej. "Gerente de Operaciones", "Analista de Datos")',
-      'Genial. ¿Cuál es tu <strong>número de teléfono</strong>?',
-      '¿Tienes una <strong>URL de LinkedIn</strong>? (escribe "omitir" si no)',
-      '¿Cuál es tu <strong>correo electrónico profesional</strong>?'
-    ];
-    await botTyping(prompts[state.subStep-1]);
-  } else {
-    // confirm
-    const d = state.data;
-    await botTyping(`
-      <div class="section-tag">Paso 1 completo ✓</div>
-      <strong>Resumen de tu información personal:</strong><br><br>
-      👤 <strong>Nombre:</strong> ${escHtml(d.nombre)}<br>
-      📍 <strong>Ubicación:</strong> ${escHtml(d.ubicacion)}<br>
-      💼 <strong>Título objetivo:</strong> ${escHtml(d.titulo)}<br>
-      📞 <strong>Teléfono:</strong> ${escHtml(d.telefono)}<br>
-      🔗 <strong>LinkedIn:</strong> ${d.linkedin ? escHtml(d.linkedin) : 'No proporcionado'}<br>
-      ✉️ <strong>Correo:</strong> ${escHtml(d.email)}<br><br>
-      ¿Todo correcto? Escribe <strong>"sí"</strong> para continuar o corrígeme lo que necesites.
-    `);
-    setChips(['Sí, continuar','Corregir nombre','Corregir email']);
-    state.step = 1; state.subStep = 99;
-  }
-}
-
-// confirm step 1
-const origStep1 = handleStep1;
-async function resolveStep1Confirm(text){
-  if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')||text.toLowerCase()==='continuar'){
-    state.step = 2; state.subStep = 0;
-    updateProgress();
-    await botTyping(`
-      <div class="section-tag">Paso 2 — Perfil Profesional</div>
-      Ahora cuéntame <strong>con tus propias palabras</strong>:<br><br>
-      <ul>
-        <li>¿Cuántos años de experiencia tienes?</li>
-        <li>¿En qué industria o área te has desempeñado?</li>
-        <li>¿Cuáles son tus principales fortalezas o logros?</li>
-        <li>¿Qué tipo de puesto buscas ahora?</li>
-      </ul>
-      <span class="tip">No te preocupes por la redacción — yo lo convertiré en un perfil profesional poderoso.</span>
-    `);
-  } else {
-    // user wants to correct something
-    await botTyping('Por supuesto, ¿qué dato necesitas corregir? Escríbeme el dato correcto y yo lo actualizo. (ej. "Email: nuevoemail@gmail.com")');
-    state.subStep = 100;
-  }
-}
-
-// ---- STEP 2 ----
-async function handleStep2(text){
-  if(state.editingResumen){
-    state.data.resumenFinal = text;
-    state.editingResumen = false;
-    await botTyping(`
-      <div class="section-tag">Perfil actualizado ✓</div>
-      <em>${escHtml(text)}</em><br><br>
-      ¡Perfecto! Perfil profesional confirmado. ¿Continuamos con tu experiencia laboral?
-    `);
-    setChips(['Sí, continuar']);
-    state.step = 2; state.subStep = 99;
-    return;
-  }
-  if(state.subStep===99){
-    if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
-      await startStep3();
-    }
-    return;
-  }
-
-  state.data.resumenRaw = text;
-  const titulo = state.data.titulo;
-  const resumen = generarResumen(text, titulo);
-  state.data.resumenFinal = resumen;
-
-  await botTyping(`
-    <div class="section-tag">Perfil Profesional Reescrito</div>
-    <em>${escHtml(resumen)}</em><br><br>
-    ¿Te gusta esta versión? Puedes escribir <strong>"sí"</strong> para confirmarla o pedirme que cambie algo específico.
-  `, 1400);
-  setChips(['Sí, me gusta','Hazlo más conciso','Hazlo más detallado']);
-  state.subStep = 1;
-}
-
-function generarResumen(raw, titulo){
-  const yrs = raw.match(/(\d+)\s*años?/i);
-  const yrStr = yrs ? `${yrs[1]} años de experiencia` : 'amplia experiencia';
-  return `Profesional con ${yrStr} en el área de ${titulo}, con sólida trayectoria en la gestión de proyectos, optimización de procesos y generación de resultados medibles. Destaca por su capacidad analítica, liderazgo de equipos multidisciplinarios y orientación estratégica alineada a los objetivos organizacionales. Reconocido por su habilidad para implementar soluciones innovadoras que incrementan la eficiencia operativa y la rentabilidad del negocio. Busca contribuir su experiencia y competencias en un rol que potencie el crecimiento sostenible de la organización.`;
-}
-
-// ---- STEP 3 ----
-async function startStep3(){
-  state.step = 3; state.subStep = 0; state.awaitingExpMore = false;
-  state.currentExp = {};
   updateProgress();
-  await botTyping(`
-    <div class="section-tag">Paso 3 — Experiencia Laboral</div>
-    Vamos con tu historial laboral. Comencemos con tu <strong>experiencia más reciente</strong>.<br><br>
-    ¿Cuál es el <strong>nombre de la empresa</strong> donde trabajaste (o trabajas actualmente)?
-  `);
+
+  // ── PASO 1: INFORMACIÓN PERSONAL ──────────────────────────
+  if(state.mode === 'p1_nombre'){
+    state.data.nombre = text;
+    state.mode = 'p1_ubicacion';
+    await botTyping('¡Perfecto! ¿Cuál es tu <strong>ubicación actual</strong>? (ciudad y estado/país)');
+
+  } else if(state.mode === 'p1_ubicacion'){
+    state.data.ubicacion = text;
+    state.mode = 'p1_titulo';
+    await botTyping('Excelente. ¿Cuál es tu <strong>título profesional o puesto objetivo</strong>?<br><span class="tip">Ej: "Gerente de Logística", "Analista de Datos", "Desarrollador Full Stack"</span>');
+
+  } else if(state.mode === 'p1_titulo'){
+    state.data.titulo = text;
+    state.mode = 'p1_telefono';
+    await botTyping('Genial. ¿Cuál es tu <strong>número de teléfono</strong>?');
+
+  } else if(state.mode === 'p1_telefono'){
+    state.data.telefono = text;
+    state.mode = 'p1_linkedin';
+    await botTyping('¿Tienes una <strong>URL de LinkedIn</strong>? (escribe "omitir" si no tienes o no quieres incluirla)');
+
+  } else if(state.mode === 'p1_linkedin'){
+    state.data.linkedin = (t === 'omitir' || t === 'no') ? '' : text;
+    state.mode = 'p1_email';
+    await botTyping('¿Cuál es tu <strong>correo electrónico profesional</strong>?');
+
+  } else if(state.mode === 'p1_email'){
+    state.data.email = text;
+    state.mode = 'p1_confirm';
+    const d = state.data;
+    await botTyping(
+      '<div class="section-tag">Paso 1 completo ✓</div>' +
+      '<strong>Resumen de tu información:</strong><br><br>' +
+      '👤 <strong>Nombre:</strong> ' + escHtml(d.nombre) + '<br>' +
+      '📍 <strong>Ubicación:</strong> ' + escHtml(d.ubicacion) + '<br>' +
+      '💼 <strong>Título objetivo:</strong> ' + escHtml(d.titulo) + '<br>' +
+      '📞 <strong>Teléfono:</strong> ' + escHtml(d.telefono) + '<br>' +
+      '🔗 <strong>LinkedIn:</strong> ' + (d.linkedin ? escHtml(d.linkedin) : 'No incluido') + '<br>' +
+      '✉️ <strong>Correo:</strong> ' + escHtml(d.email) + '<br><br>' +
+      '¿Todo correcto? Escribe <strong>"sí"</strong> para continuar o dime qué dato corregir.'
+    );
+    setChips(['Sí, continuar', 'Corregir un dato']);
+
+  } else if(state.mode === 'p1_confirm'){
+    if(yes){
+      state.mode = 'p2_raw';
+      await botTyping(
+        '<div class="section-tag">Paso 2 — Perfil Profesional</div>' +
+        'Cuéntame <strong>con tus propias palabras</strong>:<br><br>' +
+        '<ul>' +
+        '<li>¿Cuántos años de experiencia tienes?</li>' +
+        '<li>¿En qué industria o área te has desempeñado?</li>' +
+        '<li>¿Cuáles son tus principales fortalezas o logros?</li>' +
+        '<li>¿Qué tipo de puesto buscas ahora?</li>' +
+        '</ul>' +
+        '<span class="tip">No te preocupes por la redacción — yo lo convertiré en un perfil poderoso.</span>'
+      );
+    } else {
+      state.mode = 'p1_fix';
+      await botTyping('Claro, ¿qué dato necesitas corregir? Escríbelo así:<br><strong>nombre: Juan Pérez</strong> (o email, teléfono, título, linkedin, ubicación)');
+    }
+
+  } else if(state.mode === 'p1_fix'){
+    const colon = text.indexOf(':');
+    if(colon > -1){
+      const key = text.substring(0, colon).trim().toLowerCase();
+      const val = text.substring(colon + 1).trim();
+      if(key.includes('nombre')) state.data.nombre = val;
+      else if(key.includes('email') || key.includes('correo')) state.data.email = val;
+      else if(key.includes('tel')) state.data.telefono = val;
+      else if(key.includes('titul')) state.data.titulo = val;
+      else if(key.includes('linked')) state.data.linkedin = val;
+      else if(key.includes('ubica')) state.data.ubicacion = val;
+    }
+    state.mode = 'p1_confirm';
+    const d = state.data;
+    await botTyping(
+      '¡Actualizado! Así quedaron tus datos:<br><br>' +
+      '👤 ' + escHtml(d.nombre) + ' · 📍 ' + escHtml(d.ubicacion) + '<br>' +
+      '💼 ' + escHtml(d.titulo) + '<br>' +
+      '📞 ' + escHtml(d.telefono) + ' · ✉️ ' + escHtml(d.email) + '<br><br>' +
+      '¿Todo correcto ahora?'
+    );
+    setChips(['Sí, continuar', 'Corregir otro dato']);
+
+  // ── PASO 2: PERFIL PROFESIONAL ────────────────────────────
+  } else if(state.mode === 'p2_raw'){
+    const resumen = generarResumen(text, state.data.titulo);
+    state.data.resumenFinal = resumen;
+    state.mode = 'p2_confirm';
+    await botTyping(
+      '<div class="section-tag">Perfil Profesional Reescrito</div>' +
+      '<em>' + escHtml(resumen) + '</em><br><br>' +
+      '¿Te gusta esta versión? Escribe <strong>"sí"</strong> para confirmarla o dime qué cambiar.',
+      1200
+    );
+    setChips(['Sí, me gusta', 'Hazlo más conciso', 'Hazlo más detallado']);
+
+  } else if(state.mode === 'p2_confirm'){
+    if(yes){
+      state.mode = 'p3_empresa';
+      await botTyping(
+        '<div class="section-tag">Perfil confirmado ✓</div>' +
+        '<div class="section-tag" style="margin-top:8px">Paso 3 — Experiencia Laboral</div>' +
+        'Empecemos con tu <strong>experiencia más reciente</strong>.<br><br>' +
+        '¿Cuál es el <strong>nombre de la empresa</strong> donde trabajaste (o trabajas)?'
+      );
+    } else {
+      state.mode = 'p2_edit';
+      await botTyping('Claro. Puedes reescribir el perfil completo como quieras que quede, o dime el ajuste específico y yo lo aplico.');
+    }
+
+  } else if(state.mode === 'p2_edit'){
+    state.data.resumenFinal = text;
+    state.mode = 'p3_empresa';
+    await botTyping(
+      '<div class="section-tag">Perfil actualizado ✓</div>' +
+      'Perfil guardado. Ahora vamos con tu experiencia laboral.<br><br>' +
+      '¿Cuál es el <strong>nombre de la empresa</strong> más reciente?'
+    );
+
+  // ── PASO 3: EXPERIENCIA LABORAL ───────────────────────────
+  } else if(state.mode === 'p3_empresa'){
+    state.currentExp = { empresa: text };
+    state.mode = 'p3_puesto';
+    await botTyping('¿Cuál fue tu <strong>puesto o cargo</strong> en ' + escHtml(text) + '?');
+
+  } else if(state.mode === 'p3_puesto'){
+    state.currentExp.puesto = text;
+    state.mode = 'p3_inicio';
+    await botTyping('¿Cuál fue tu <strong>fecha de inicio</strong>? (ej. "Enero 2020" o "01/2020")');
+
+  } else if(state.mode === 'p3_inicio'){
+    state.currentExp.inicio = text;
+    state.mode = 'p3_fin';
+    await botTyping('¿Cuál fue tu <strong>fecha de fin</strong>? (escribe "Actual" si sigues ahí)');
+
+  } else if(state.mode === 'p3_fin'){
+    state.currentExp.fin = text;
+    state.mode = 'p3_desc';
+    await botTyping(
+      'Perfecto. Ahora descríbeme brevemente:<br><br>' +
+      '<ul>' +
+      '<li>¿Cuáles eran tus <strong>principales funciones</strong>?</li>' +
+      '<li>¿Qué <strong>herramientas o sistemas</strong> usabas?</li>' +
+      '<li>¿Qué <strong>resultados o logros</strong> obtuviste?</li>' +
+      '</ul>' +
+      '<span class="tip">Entre más detalle, mejores quedarán tus bullets.</span>'
+    );
+
+  } else if(state.mode === 'p3_desc'){
+    const exp = state.currentExp;
+    exp.descripcion = text;
+    exp.bullets = generarBullets(exp);
+    state.data.experiencias.push(Object.assign({}, exp));
+    state.mode = 'p3_confirm';
+    await botTyping(
+      '<div class="section-tag">Experiencia Reescrita — Formato CAR</div>' +
+      '<strong>' + escHtml(exp.empresa) + '</strong> · ' + escHtml(exp.puesto) + '<br>' +
+      '<em>' + escHtml(exp.inicio) + ' – ' + escHtml(exp.fin) + '</em><br><br>' +
+      '<ul>' + formatBullets(exp.bullets) + '</ul><br>' +
+      '¿Te parece bien? Escribe <strong>"sí"</strong> para confirmar o dime qué ajustar.',
+      1400
+    );
+    setChips(['Sí, confirmar', 'Cambiar redacción']);
+
+  } else if(state.mode === 'p3_confirm'){
+    if(yes){
+      state.mode = 'p3_more';
+      await botTyping(
+        '<div class="section-tag">Experiencia guardada ✓</div>' +
+        '¿Tienes <strong>otra experiencia laboral</strong> que agregar?'
+      );
+      setChips(['Sí, agregar otra', 'No, continuar']);
+    } else {
+      state.mode = 'p3_edit';
+      await botTyping('Entendido. Reescribe los bullets como quieres que queden (uno por línea) o dime el cambio puntual.');
+    }
+
+  } else if(state.mode === 'p3_edit'){
+    state.data.experiencias[state.data.experiencias.length - 1].bullets = text;
+    state.mode = 'p3_more';
+    await botTyping(
+      '<div class="section-tag">Experiencia actualizada ✓</div>' +
+      '¿Tienes <strong>otra experiencia laboral</strong> que agregar?'
+    );
+    setChips(['Sí, agregar otra', 'No, continuar']);
+
+  } else if(state.mode === 'p3_more'){
+    if(yes){
+      state.currentExp = {};
+      state.mode = 'p3_empresa';
+      await botTyping('¿Cuál es el <strong>nombre de la siguiente empresa</strong>?');
+    } else {
+      state.mode = 'p4_grado';
+      state.currentEdu = {};
+      await botTyping(
+        '<div class="section-tag">Paso 4 — Educación</div>' +
+        '¿Cuál es el <strong>nombre de tu grado o certificación</strong>?<br>' +
+        '<span class="tip">Ej: "Licenciatura en Administración", "Certificación PMP", "MBA"</span>'
+      );
+    }
+
+  // ── PASO 4: EDUCACIÓN ─────────────────────────────────────
+  } else if(state.mode === 'p4_grado'){
+    state.currentEdu = { grado: text };
+    state.mode = 'p4_institucion';
+    await botTyping('¿Cuál es el <strong>nombre de la institución</strong>?');
+
+  } else if(state.mode === 'p4_institucion'){
+    state.currentEdu.institucion = text;
+    state.mode = 'p4_anios';
+    await botTyping('¿En qué <strong>años estudiaste</strong>? (ej. "2015 – 2019" o "2018")');
+
+  } else if(state.mode === 'p4_anios'){
+    state.currentEdu.anios = text;
+    state.mode = 'p4_ubicacion';
+    await botTyping('¿Cuál es la <strong>ubicación</strong> de la institución? (ciudad/país — escribe "omitir" si no quieres incluirla)');
+
+  } else if(state.mode === 'p4_ubicacion'){
+    state.currentEdu.ubicacion = (t === 'omitir') ? '' : text;
+    state.data.educacion.push(Object.assign({}, state.currentEdu));
+    state.mode = 'p4_more';
+    const edu = state.currentEdu;
+    await botTyping(
+      '<div class="section-tag">Educación guardada ✓</div>' +
+      '<strong>' + escHtml(edu.grado) + '</strong><br>' +
+      escHtml(edu.institucion) + (edu.ubicacion ? ' — ' + escHtml(edu.ubicacion) : '') + ' · ' + escHtml(edu.anios) + '<br><br>' +
+      '¿Tienes <strong>otra formación o certificación</strong> que agregar?'
+    );
+    setChips(['Sí, agregar otra', 'No, continuar']);
+
+  } else if(state.mode === 'p4_more'){
+    if(yes){
+      state.currentEdu = {};
+      state.mode = 'p4_grado';
+      await botTyping('¿Cuál es el nombre del siguiente <strong>grado o certificación</strong>?');
+    } else {
+      state.mode = 'p5_raw';
+      await botTyping(
+        '<div class="section-tag">Paso 5 — Competencias y Habilidades</div>' +
+        'Lista todas tus <strong>competencias clave y habilidades técnicas</strong>:<br><br>' +
+        '<ul>' +
+        '<li>Software o herramientas (ej. Excel, SAP, AutoCAD)</li>' +
+        '<li>Metodologías (ej. Agile, Lean, Six Sigma)</li>' +
+        '<li>Idiomas (ej. Español nativo, Inglés avanzado)</li>' +
+        '<li>Habilidades blandas (ej. Liderazgo, Negociación)</li>' +
+        '</ul>' +
+        '<span class="tip">Sepáralas con comas o escríbelas en líneas distintas.</span>'
+      );
+    }
+
+  // ── PASO 5: HABILIDADES ───────────────────────────────────
+  } else if(state.mode === 'p5_raw'){
+    const skills = organizarHabilidades(text);
+    state.data.habilidadesFinal = skills;
+    state.mode = 'p5_confirm';
+    await botTyping(
+      '<div class="section-tag">Habilidades Organizadas</div>' +
+      escHtml(skills).replace(/\n/g, '<br>') + '<br><br>' +
+      '¿Te parece bien esta organización? Escribe <strong>"sí"</strong> para confirmar.',
+      1000
+    );
+    setChips(['Sí, confirmar', 'Modificar']);
+
+  } else if(state.mode === 'p5_confirm'){
+    if(yes){
+      state.mode = 'p6_plantilla';
+      await botTyping(
+        '<div class="section-tag">Paso 6 — Elige tu Plantilla</div>' +
+        'Tenemos 3 diseños. Escoge el que mejor refleje tu perfil:<br><br>' +
+        '<strong>🅐 Ejecutivo Clásico</strong> — Columna única, paleta azul marino. Ideal para roles corporativos y senior.<br><br>' +
+        '<strong>🅑 Moderno Dividido</strong> — Dos columnas con barra lateral oscura. Ideal para tecnología y logística.<br><br>' +
+        '<strong>🅒 Minimalista Bold</strong> — Franja de color en header. Ideal para roles creativos y comerciales.<br><br>' +
+        '¿Cuál prefieres? (A, B o C)',
+        900
+      );
+      setChips(['A — Ejecutivo Clásico', 'B — Moderno Dividido', 'C — Minimalista Bold']);
+    } else {
+      state.mode = 'p5_edit';
+      await botTyping('Escríbeme las habilidades exactamente como quieres que queden.');
+    }
+
+  } else if(state.mode === 'p5_edit'){
+    state.data.habilidadesFinal = text;
+    state.mode = 'p6_plantilla';
+    await botTyping(
+      '<div class="section-tag">Habilidades actualizadas ✓</div>' +
+      'Habilidades guardadas. Ahora elige tu plantilla:<br><br>' +
+      '<strong>A</strong> — Ejecutivo Clásico &nbsp;|&nbsp; <strong>B</strong> — Moderno Dividido &nbsp;|&nbsp; <strong>C</strong> — Minimalista Bold'
+    );
+    setChips(['A — Ejecutivo Clásico', 'B — Moderno Dividido', 'C — Minimalista Bold']);
+
+  // ── PASO 6: PLANTILLA ─────────────────────────────────────
+  } else if(state.mode === 'p6_plantilla'){
+    const tu = text.toUpperCase();
+    if(tu.includes('A')) state.data.plantilla = 'A';
+    else if(tu.includes('B')) state.data.plantilla = 'B';
+    else if(tu.includes('C')) state.data.plantilla = 'C';
+    else {
+      await botTyping('Por favor elige <strong>A</strong>, <strong>B</strong> o <strong>C</strong>.');
+      setChips(['A', 'B', 'C']);
+      return;
+    }
+    const nombres = { A: 'Ejecutivo Clásico', B: 'Moderno Dividido', C: 'Minimalista Bold' };
+    state.mode = 'p7_done';
+    await botTyping(
+      '<div class="section-tag">Plantilla ' + state.data.plantilla + ' seleccionada ✓</div>' +
+      '¡Todo listo! Generando tu CV <strong>' + nombres[state.data.plantilla] + '</strong>...',
+      600
+    );
+    await sleep(600);
+    showCVPreview();
+
+  // ── PASO 7: POST-ACCIONES ─────────────────────────────────
+  } else if(state.mode === 'p7_done'){
+    if(t.includes('ver') || t.includes('preview')){
+      showCVPreview();
+    } else if(t.includes('plantilla') || t.includes('cambiar')){
+      state.mode = 'p6_plantilla';
+      await botTyping('¿Qué plantilla prefieres ahora? (A, B o C)');
+      setChips(['A — Ejecutivo Clásico', 'B — Moderno Dividido', 'C — Minimalista Bold']);
+    } else {
+      showCVPreview();
+    }
+  }
 }
 
-async function handleStep3(text){
-  if(state.awaitingExpMore){
-    if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
-      state.currentExp = {};
-      state.awaitingExpMore = false;
-      state.subStep = 0;
-      await botTyping('¡Perfecto! ¿Cuál es el <strong>nombre de la siguiente empresa</strong>?');
-    } else {
-      await startStep4();
-    }
-    return;
-  }
-  if(state.awaitingExpEdit){
-    state.data.experiencias[state.data.experiencias.length-1].bullets = text;
-    state.awaitingExpEdit = false;
-    await botTyping(`
-      <div class="section-tag">Experiencia actualizada ✓</div>
-      Experiencia guardada correctamente.<br><br>
-      ¿Tienes <strong>otra experiencia laboral</strong> que agregar?
-    `);
-    setChips(['Sí, agregar otra','No, continuar']);
-    state.awaitingExpMore = true;
-    return;
-  }
-
-  const sub = state.subStep;
-  if(sub===0){ state.currentExp.empresa = text; state.subStep=1;
-    await botTyping('¿Cuál fue tu <strong>puesto o cargo</strong> en esa empresa?'); }
-  else if(sub===1){ state.currentExp.puesto = text; state.subStep=2;
-    await botTyping('¿Cuál fue tu <strong>fecha de inicio</strong>? (ej. "Enero 2020" o "01/2020")'); }
-  else if(sub===2){ state.currentExp.inicio = text; state.subStep=3;
-    await botTyping('¿Cuál fue tu <strong>fecha de fin</strong>? (escribe "Actual" si sigues trabajando ahí)'); }
-  else if(sub===3){ state.currentExp.fin = text; state.subStep=4;
-    await botTyping(`
-      Excelente. Ahora descríbeme brevemente:<br><br>
-      <ul>
-        <li>¿Cuáles eran tus <strong>principales funciones</strong>?</li>
-        <li>¿Qué <strong>herramientas o sistemas</strong> usabas?</li>
-        <li>¿Qué <strong>resultados o logros</strong> obtuviste? (números si recuerdas)</li>
-      </ul>
-      <span class="tip">Entre más detalle, mejor podrá quedar tu CV.</span>
-    `); }
-  else if(sub===4){
-    state.currentExp.descripcion = text;
-    const bullets = generarBullets(state.currentExp);
-    state.currentExp.bullets = bullets;
-    state.data.experiencias.push({...state.currentExp});
-    await botTyping(`
-      <div class="section-tag">Experiencia Reescrita (Formato CAR)</div>
-      <strong>${escHtml(state.currentExp.empresa)}</strong> — ${escHtml(state.currentExp.puesto)}<br>
-      <em>${escHtml(state.currentExp.inicio)} – ${escHtml(state.currentExp.fin)}</em><br><br>
-      <ul>${formatBullets(bullets)}</ul><br>
-      ¿Te parece bien esta versión? Escribe <strong>"sí"</strong> para confirmar o dime qué ajustar.
-    `, 1400);
-    setChips(['Sí, confirmar','Mejorar resultados','Cambiar redacción']);
-    state.subStep = 5;
-  }
-  else if(sub===5){
-    if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
-      await botTyping(`
-        <div class="section-tag">Experiencia guardada ✓</div>
-        ¿Tienes <strong>otra experiencia laboral</strong> que agregar?
-      `);
-      setChips(['Sí, agregar otra','No, continuar']);
-      state.awaitingExpMore = true;
-    } else {
-      await botTyping('Entendido. ¿Qué te gustaría cambiar? Puedes reescribir los bullets completos o indicarme el ajuste específico.');
-      state.awaitingExpEdit = true;
-    }
-  }
+// ============================================================
+//  HELPERS DE CONTENIDO
+// ============================================================
+function generarResumen(raw, titulo){
+  const yrs = raw.match(/(\d+)\s*a[ñn]/i);
+  const yrStr = yrs ? yrs[1] + ' años de experiencia' : 'amplia experiencia';
+  return 'Profesional con ' + yrStr + ' en el área de ' + titulo + ', con sólida trayectoria en la gestión de proyectos, optimización de procesos y generación de resultados medibles. Destaca por su capacidad analítica, liderazgo de equipos multidisciplinarios y orientación estratégica alineada a los objetivos organizacionales. Reconocido por su habilidad para implementar soluciones innovadoras que incrementan la eficiencia operativa y la rentabilidad del negocio. Busca contribuir su experiencia y competencias en un rol que potencie el crecimiento sostenible de la organización.';
 }
 
 function generarBullets(exp){
-  return `• Lideré las operaciones del área de ${exp.puesto.toLowerCase()} optimizando los procesos internos y reduciendo tiempos de ciclo en un 20%.
-• Implementé herramientas y metodologías que permitieron incrementar la productividad del equipo en más del 15% en un período de 6 meses.
-• Gestioné relaciones estratégicas con clientes y proveedores clave, logrando mantener un índice de satisfacción superior al 90%.
-• Coordiné proyectos multidisciplinarios alineados a los objetivos organizacionales, cumpliendo con los plazos y presupuestos establecidos.
-• Generé reportes ejecutivos y análisis de KPIs que apoyaron la toma de decisiones de la dirección general.`;
-}
-
-// ---- STEP 4 ----
-async function startStep4(){
-  state.step = 4; state.subStep = 0; state.awaitingEduMore = false;
-  updateProgress();
-  await botTyping(`
-    <div class="section-tag">Paso 4 — Educación</div>
-    Cuéntame sobre tu formación académica. ¿Cuál es el <strong>nombre de tu grado o certificación</strong>?<br>
-    (ej. "Licenciatura en Administración de Empresas", "Certificación PMP", "MBA")
-  `);
-}
-
-async function handleStep4(text){
-  if(state.awaitingEduMore){
-    if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
-      state.awaitingEduMore=false; state.subStep=0;
-      state.currentEdu={};
-      await botTyping('¿Cuál es el nombre del siguiente <strong>grado o certificación</strong>?');
-    } else {
-      await startStep5();
-    }
-    return;
-  }
-  const sub = state.subStep;
-  if(!state.currentEdu) state.currentEdu={};
-  if(sub===0){ state.currentEdu.grado=text; state.subStep=1;
-    await botTyping('¿Cuál es el <strong>nombre de la institución</strong>?'); }
-  else if(sub===1){ state.currentEdu.institucion=text; state.subStep=2;
-    await botTyping('¿En qué <strong>año iniciaste</strong> y en qué <strong>año terminaste o te graduaste</strong>? (ej. "2015 – 2019")'); }
-  else if(sub===2){ state.currentEdu.anios=text; state.subStep=3;
-    await botTyping('¿Cuál es la <strong>ubicación</strong> de la institución? (ciudad/país — escribe "omitir" si prefieres no incluirla)'); }
-  else if(sub===3){
-    state.currentEdu.ubicacion = text.toLowerCase()==='omitir'?'':text;
-    state.data.educacion.push({...state.currentEdu});
-    await botTyping(`
-      <div class="section-tag">Educación guardada ✓</div>
-      <strong>${escHtml(state.currentEdu.grado)}</strong><br>
-      ${escHtml(state.currentEdu.institucion)}${state.currentEdu.ubicacion?' — '+escHtml(state.currentEdu.ubicacion):''} · ${escHtml(state.currentEdu.anios)}<br><br>
-      ¿Tienes <strong>otra formación académica o certificación</strong> que agregar?
-    `);
-    setChips(['Sí, agregar otra','No, continuar']);
-    state.awaitingEduMore=true;
-  }
-}
-
-// ---- STEP 5 ----
-async function startStep5(){
-  state.step=5; state.subStep=0;
-  updateProgress();
-  await botTyping(`
-    <div class="section-tag">Paso 5 — Competencias y Habilidades</div>
-    Lista todas tus <strong>competencias clave y habilidades técnicas</strong>. Pueden ser:<br><br>
-    <ul>
-      <li>Software o herramientas (ej. Excel, SAP, AutoCAD)</li>
-      <li>Metodologías (ej. Agile, Lean, Six Sigma)</li>
-      <li>Idiomas (ej. Español nativo, Inglés avanzado)</li>
-      <li>Habilidades blandas destacadas (ej. Liderazgo, Negociación)</li>
-    </ul>
-    <span class="tip">Puedes separarlas con comas o escribirlas en líneas distintas.</span>
-  `);
-}
-
-async function handleStep5(text){
-  if(state.editingSkills){
-    state.data.habilidadesFinal = text;
-    state.editingSkills = false;
-    await botTyping(`
-      <div class="section-tag">Habilidades actualizadas ✓</div>
-      Habilidades guardadas. ¿Continuamos con la selección de plantilla?
-    `);
-    setChips(['Sí, continuar']);
-    state.subStep=99;
-    return;
-  }
-  if(state.subStep===99){
-    if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
-      await startStep6();
-    }
-    return;
-  }
-  state.data.habilidades = text;
-  const skills = organizarHabilidades(text);
-  state.data.habilidadesFinal = skills;
-  await botTyping(`
-    <div class="section-tag">Habilidades Organizadas</div>
-    ${escHtml(skills).replace(/\n/g,'<br>')}<br><br>
-    ¿Te parece bien esta organización? Escribe <strong>"sí"</strong> para confirmar o ajusta lo que necesites.
-  `, 1200);
-  setChips(['Sí, confirmar','Modificar']);
-  state.subStep=1;
-}
-
-async function handleStep5Confirm(text){
-  if(text.toLowerCase().includes('sí')||text.toLowerCase().includes('si')){
-    await startStep6();
-  } else {
-    await botTyping('Escríbeme las habilidades como quieres que queden y yo las guardo.');
-    state.editingSkills=true;
-  }
+  return '• Lideré las operaciones del área de ' + exp.puesto.toLowerCase() + ', optimizando procesos internos y reduciendo tiempos de ciclo en un 20%.\n' +
+    '• Implementé metodologías que incrementaron la productividad del equipo en más del 15% en un período de 6 meses.\n' +
+    '• Gestioné relaciones con clientes y proveedores clave, manteniendo un índice de satisfacción superior al 90%.\n' +
+    '• Coordiné proyectos multidisciplinarios cumpliendo plazos y presupuestos establecidos.\n' +
+    '• Generé reportes ejecutivos y análisis de KPIs que apoyaron la toma de decisiones estratégicas.';
 }
 
 function organizarHabilidades(raw){
-  const items = raw.split(/[,\n;]+/).map(s=>s.trim()).filter(s=>s);
-  const tech=[],soft=[],lang=[],tools=[];
-  const softKws=['liderazgo','comunicación','negociación','trabajo en equipo','gestión','planificación','pensamiento','proactividad','adaptabilidad','creatividad','organización'];
-  const langKws=['español','inglés','francés','portugués','alemán','chino','árabe','nativo','avanzado','intermedio','básico'];
-  items.forEach(i=>{
-    const il=i.toLowerCase();
-    if(langKws.some(k=>il.includes(k))) lang.push(i);
-    else if(softKws.some(k=>il.includes(k))) soft.push(i);
+  const items = raw.split(/[,\n;]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s; });
+  const tools = [], soft = [], lang = [];
+  const softKws = ['liderazgo','comunicación','negociación','equipo','gestión','planificación','proactividad','adaptabilidad','creatividad','organización'];
+  const langKws = ['español','inglés','francés','portugués','alemán','chino','árabe','nativo','avanzado','intermedio','básico'];
+  items.forEach(function(i){
+    const il = i.toLowerCase();
+    if(langKws.some(function(k){ return il.includes(k); })) lang.push(i);
+    else if(softKws.some(function(k){ return il.includes(k); })) soft.push(i);
     else tools.push(i);
   });
-  let out='';
-  if(tools.length) out+=`Herramientas y Tecnologías: ${tools.join(' · ')}\n`;
-  if(soft.length) out+=`Competencias Blandas: ${soft.join(' · ')}\n`;
-  if(lang.length) out+=`Idiomas: ${lang.join(' · ')}`;
-  return out.trim()||raw;
-}
-
-// ---- STEP 6 ----
-async function startStep6(){
-  state.step=6; state.subStep=0;
-  updateProgress();
-  await botTyping(`
-    <div class="section-tag">Paso 6 — Elige tu Plantilla</div>
-    Tenemos 3 diseños para tu CV. Escoge el que mejor refleje tu perfil:<br><br>
-    <strong>🅐 Ejecutivo Clásico</strong><br>
-    Columna única, espaciado generoso, paleta azul marino. Ideal para roles corporativos y senior.<br><br>
-    <strong>🅑 Moderno Dividido</strong><br>
-    Dos columnas con barra lateral oscura. Ideal para tecnología, logística y nivel medio.<br><br>
-    <strong>🅒 Minimalista Bold</strong><br>
-    Franja de color en header, tipografía sans-serif bold. Ideal para roles creativos y comerciales.<br><br>
-    ¿Cuál prefieres? (A, B o C)
-  `, 1000);
-  setChips(['A — Ejecutivo Clásico','B — Moderno Dividido','C — Minimalista Bold']);
-}
-
-async function handleStep6(text){
-  const t = text.toUpperCase();
-  if(t.includes('A')){ state.data.plantilla='A'; }
-  else if(t.includes('B')){ state.data.plantilla='B'; }
-  else if(t.includes('C')){ state.data.plantilla='C'; }
-  else {
-    await botTyping('Por favor elige <strong>A</strong>, <strong>B</strong> o <strong>C</strong>.');
-    setChips(['A','B','C']);
-    return;
-  }
-  const nombres = {A:'Ejecutivo Clásico',B:'Moderno Dividido',C:'Minimalista Bold'};
-  await botTyping(`
-    <div class="section-tag">Plantilla seleccionada ✓</div>
-    Plantilla <strong>${state.data.plantilla} — ${nombres[state.data.plantilla]}</strong> seleccionada.<br><br>
-    ¡Todo listo! Voy a generar tu CV completo ahora. ¿Procedemos?
-  `);
-  setChips(['¡Generar mi CV!']);
-  state.step=7;
-}
-
-// ---- STEP 7 ----
-async function handleStep7(text){
-  updateProgress();
-  await botTyping('Ensamblando tu CV profesional optimizado para ATS...', 1600);
-  await sleep(800);
-  showCVPreview();
+  const out = [];
+  if(tools.length) out.push('Herramientas y Tecnologías: ' + tools.join(' · '));
+  if(soft.length) out.push('Competencias Blandas: ' + soft.join(' · '));
+  if(lang.length) out.push('Idiomas: ' + lang.join(' · '));
+  return out.length ? out.join('\n') : raw;
 }
 
 // ============================================================
-//  OVERRIDE processInput to handle confirm states
-// ============================================================
-const _orig = processInput;
-async function processInput(text){
-  // Step 1 confirm
-  if(state.step===1 && state.subStep===99){
-    await resolveStep1Confirm(text); return;
-  }
-  if(state.step===1 && state.subStep===100){
-    // inline correction
-    const lower = text.toLowerCase();
-    if(lower.startsWith('nombre:')) state.data.nombre=text.split(':')[1].trim();
-    else if(lower.startsWith('email:')) state.data.email=text.split(':')[1].trim();
-    else if(lower.startsWith('teléfono:')||lower.startsWith('telefono:')) state.data.telefono=text.split(':')[1].trim();
-    else if(lower.startsWith('título:')||lower.startsWith('titulo:')) state.data.titulo=text.split(':')[1].trim();
-    else if(lower.startsWith('linkedin:')) state.data.linkedin=text.split(':')[1].trim();
-    else if(lower.startsWith('ubicación:')||lower.startsWith('ubicacion:')) state.data.ubicacion=text.split(':')[1].trim();
-    await botTyping('¡Actualizado! ¿Algún otro dato que corregir? Escribe <strong>"sí, continuar"</strong> cuando todo esté correcto.');
-    setChips(['Sí, continuar','Corregir otro dato']);
-    state.subStep=99; return;
-  }
-  // Step 2 confirm after rewrite
-  if(state.step===2 && state.subStep===1 && !state.editingResumen){
-    const t=text.toLowerCase();
-    if(t.includes('sí')||t.includes('si')){
-      state.step=2; state.subStep=99;
-      await botTyping(`
-        <div class="section-tag">Perfil confirmado ✓</div>
-        Perfil profesional guardado. ¿Continuamos con la experiencia laboral?
-      `);
-      setChips(['Sí, continuar']);
-    } else {
-      await botTyping('Claro, ¿qué ajuste necesitas? Puedes reescribirlo completo o indicarme el cambio específico.');
-      state.editingResumen=true;
-    }
-    return;
-  }
-  // Step 5 confirm
-  if(state.step===5 && state.subStep===1 && !state.editingSkills){
-    await handleStep5Confirm(text); return;
-  }
-  await _orig(text);
-}
-// reassign
-window.processInput = processInput;
-
-// ============================================================
-//  CV GENERATION
+//  CV PREVIEW & PDF
 // ============================================================
 function showCVPreview(){
-  const body = document.getElementById('cvPreviewBody');
-  body.innerHTML = buildCV(state.data.plantilla);
+  document.getElementById('cvPreviewBody').innerHTML = buildCV(state.data.plantilla);
   document.getElementById('cvOverlay').classList.add('open');
 }
 
 function closePreview(){
   document.getElementById('cvOverlay').classList.remove('open');
-  botTyping(`
-    <div class="section-tag">Tu CV está listo</div>
-    Puedes:<br>
-    <strong>(a)</strong> Volver a abrir la vista previa<br>
-    <strong>(b)</strong> Pedir cambios específicos<br>
-    <strong>(c)</strong> Cambiar de plantilla
-  `);
-  setChips(['Ver CV de nuevo','Cambiar plantilla','Hacer ediciones']);
-  state.step=7;
+  state.mode = 'p7_done';
+  botTyping(
+    '<div class="section-tag">Tu CV está listo 🎉</div>' +
+    'Opciones:<br>' +
+    '<strong>(a)</strong> Ver CV de nuevo<br>' +
+    '<strong>(b)</strong> Cambiar plantilla<br>' +
+    '<strong>(c)</strong> Descargar PDF desde la vista previa'
+  );
+  setChips(['Ver CV de nuevo', 'Cambiar plantilla']);
 }
 
 function changeTemplate(){
-  closePreview();
-  setTimeout(async()=>{
-    state.step=6;
-    await startStep6();
-  },300);
+  document.getElementById('cvOverlay').classList.remove('open');
+  state.mode = 'p6_plantilla';
+  setTimeout(function(){
+    botTyping('¿Qué plantilla prefieres? (A, B o C)');
+    setChips(['A — Ejecutivo Clásico', 'B — Moderno Dividido', 'C — Minimalista Bold']);
+  }, 200);
 }
 
 function downloadPDF(){
   const el = document.getElementById('cvPreviewBody');
-  const pri = window.open('','_blank','width=900,height=700');
-  pri.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <title>CV - ${escHtml(state.data.nombre)}</title>
-    <style>
-      body{margin:0;padding:0;font-family:'Segoe UI',sans-serif;}
-      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
-      ${getAllStyles()}
-    </style></head><body>`);
+  const pri = window.open('', '_blank', 'width=900,height=700');
+  if(!pri){ alert('Permite ventanas emergentes para descargar el PDF.'); return; }
+  let css = '';
+  try {
+    for(const sheet of document.styleSheets){
+      for(const rule of sheet.cssRules){ css += rule.cssText; }
+    }
+  } catch(e){}
+  pri.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>CV - ' + escHtml(state.data.nombre) + '</title><style>body{margin:0;padding:0;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}' + css + '</style></head><body>');
   pri.document.write(el.innerHTML);
   pri.document.write('</body></html>');
   pri.document.close();
   pri.focus();
-  setTimeout(()=>{ pri.print(); pri.close(); }, 500);
-}
-
-function getAllStyles(){
-  let css='';
-  for(const sheet of document.styleSheets){
-    try{
-      for(const rule of sheet.cssRules){ css+=rule.cssText; }
-    }catch(e){}
-  }
-  return css;
+  setTimeout(function(){ pri.print(); }, 600);
 }
 
 // ============================================================
 //  CV BUILDERS
 // ============================================================
-function buildCV(tpl){
-  if(tpl==='A') return buildCVA();
-  if(tpl==='B') return buildCVB();
-  return buildCVC();
-}
-
 function expHtml(exps, cls){
-  return exps.map(e=>`
-    <div style="margin-bottom:16px">
-      <div class="${cls}-job-header">
-        <span class="${cls}-company">${escHtml(e.empresa)}</span>
-        <span class="${cls}-dates">${escHtml(e.inicio)} – ${escHtml(e.fin)}</span>
-      </div>
-      <div class="${cls}-role">${escHtml(e.puesto)}</div>
-      <ul>${formatBullets(e.bullets)}</ul>
-    </div>
-  `).join('');
+  return exps.map(function(e){
+    return '<div style="margin-bottom:16px">' +
+      '<div class="' + cls + '-job-header">' +
+        '<span class="' + cls + '-company">' + escHtml(e.empresa) + '</span>' +
+        '<span class="' + cls + '-dates">' + escHtml(e.inicio) + ' – ' + escHtml(e.fin) + '</span>' +
+      '</div>' +
+      '<div class="' + cls + '-role">' + escHtml(e.puesto) + '</div>' +
+      '<ul>' + formatBullets(e.bullets) + '</ul>' +
+    '</div>';
+  }).join('');
 }
 
 function eduHtml(edus, cls){
-  return edus.map(e=>`
-    <div class="${cls}-edu-line">
-      <strong>${escHtml(e.grado)}</strong> — ${escHtml(e.institucion)}${e.ubicacion?' · '+escHtml(e.ubicacion):''} · ${escHtml(e.anios)}
-    </div>
-  `).join('');
+  return edus.map(function(e){
+    return '<div class="' + cls + '-edu-line"><strong>' + escHtml(e.grado) + '</strong> — ' +
+      escHtml(e.institucion) + (e.ubicacion ? ' · ' + escHtml(e.ubicacion) : '') + ' · ' + escHtml(e.anios) + '</div>';
+  }).join('');
 }
 
-function skillsHtml(raw, style){
-  const lines = raw.split('\n').filter(l=>l.trim());
-  if(style==='chips'){
-    const all = raw.replace(/[A-Za-záéíóúÁÉÍÓÚñÑ\s]+:\s*/g,'').split(/[·,;]+/).map(s=>s.trim()).filter(s=>s);
-    return all.map(s=>`<span class="cv-skill-chip">${escHtml(s)}</span>`).join('');
-  }
-  if(style==='sidebar'){
-    const all = raw.replace(/[A-Za-záéíóúÁÉÍÓÚñÑ\s]+:\s*/g,'').split(/[·,;]+/).map(s=>s.trim()).filter(s=>s);
-    return all.map(s=>`<div class="cv-b cv-skill-item">${escHtml(s)}</div>`).join('');
-  }
-  return lines.map(l=>`<div>${escHtml(l)}</div>`).join('');
+function skillChips(raw, chipClass){
+  const all = raw.replace(/[A-Za-záéíóúÁÉÍÓÚñÑ\s]+:\s*/g, '').split(/[·,;]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s; });
+  return all.map(function(s){ return '<span class="' + chipClass + '">' + escHtml(s) + '</span>'; }).join('');
 }
 
-function buildCVA(){
-  const d=state.data;
-  return `<div class="cv-a">
-    <div class="cv-name">${escHtml(d.nombre)}</div>
-    <div class="cv-title">${escHtml(d.titulo)}</div>
-    <div class="cv-contact">
-      <span>📞 ${escHtml(d.telefono)}</span>
-      <span>✉️ ${escHtml(d.email)}</span>
-      <span>📍 ${escHtml(d.ubicacion)}</span>
-      ${d.linkedin?`<span>🔗 ${escHtml(d.linkedin)}</span>`:''}
-    </div>
-    <hr class="cv-divider">
-    <div class="cv-section-title">Perfil Profesional</div>
-    <p style="font-size:0.87rem;line-height:1.65;color:#333;">${escHtml(d.resumenFinal)}</p>
-    <hr class="cv-divider">
-    <div class="cv-section-title">Experiencia Laboral</div>
-    ${expHtml(d.experiencias,'cv-a')}
-    <hr class="cv-divider">
-    <div class="cv-section-title">Educación</div>
-    ${eduHtml(d.educacion,'cv-a')}
-    <hr class="cv-divider">
-    <div class="cv-section-title">Competencias Clave</div>
-    <div class="cv-skills-grid">${skillsHtml(d.habilidadesFinal,'chips')}</div>
-  </div>`;
-}
-
-function buildCVB(){
-  const d=state.data;
-  const allSkills = d.habilidadesFinal.replace(/[A-Za-záéíóúÁÉÍÓÚñÑ\s]+:\s*/g,'').split(/[·,;]+/).map(s=>s.trim()).filter(s=>s);
-  return `<div class="cv-b">
-    <div class="cv-sidebar">
-      <div class="cv-name">${escHtml(d.nombre)}</div>
-      <div class="cv-title">${escHtml(d.titulo)}</div>
-      <div class="cv-sidebar-section">
-        <div class="cv-sidebar-title">Contacto</div>
-        <div class="cv-contact-item">📞 ${escHtml(d.telefono)}</div>
-        <div class="cv-contact-item">✉️ ${escHtml(d.email)}</div>
-        <div class="cv-contact-item">📍 ${escHtml(d.ubicacion)}</div>
-        ${d.linkedin?`<div class="cv-contact-item">🔗 ${escHtml(d.linkedin)}</div>`:''}
-      </div>
-      <div class="cv-sidebar-section">
-        <div class="cv-sidebar-title">Habilidades</div>
-        ${allSkills.map(s=>`<div class="cv-skill-item" style="background:rgba(255,255,255,0.12);padding:4px 10px;border-radius:4px;font-size:0.78rem;margin-bottom:5px;color:white;">${escHtml(s)}</div>`).join('')}
-      </div>
-    </div>
-    <div class="cv-main">
-      <div class="cv-main-section">
-        <div class="cv-section-title">Perfil Profesional</div>
-        <p class="cv-summary">${escHtml(d.resumenFinal)}</p>
-      </div>
-      <div class="cv-main-section">
-        <div class="cv-section-title">Experiencia Laboral</div>
-        ${expHtml(d.experiencias,'cv-b')}
-      </div>
-      <div class="cv-main-section">
-        <div class="cv-section-title">Educación</div>
-        ${eduHtml(d.educacion,'cv-b')}
-      </div>
-    </div>
-  </div>`;
-}
-
-function buildCVC(){
-  const d=state.data;
-  return `<div class="cv-c">
-    <div class="cv-header-band">
-      <div class="cv-name">${escHtml(d.nombre)}</div>
-      <div class="cv-title">${escHtml(d.titulo)}</div>
-      <div class="cv-contact">
-        <span>📞 ${escHtml(d.telefono)}</span>
-        <span>✉️ ${escHtml(d.email)}</span>
-        <span>📍 ${escHtml(d.ubicacion)}</span>
-        ${d.linkedin?`<span>🔗 ${escHtml(d.linkedin)}</span>`:''}
-      </div>
-    </div>
-    <div class="cv-body">
-      <div class="cv-section">
-        <div class="cv-section-title">Perfil Profesional</div>
-        <p class="cv-summary">${escHtml(d.resumenFinal)}</p>
-      </div>
-      <div class="cv-section">
-        <div class="cv-section-title">Experiencia Laboral</div>
-        ${expHtml(d.experiencias,'cv-c')}
-      </div>
-      <div class="cv-section">
-        <div class="cv-section-title">Educación</div>
-        ${eduHtml(d.educacion,'cv-c')}
-      </div>
-      <div class="cv-section">
-        <div class="cv-section-title">Competencias Clave</div>
-        <div class="cv-skills-grid">${skillsHtml(d.habilidadesFinal,'chips')}</div>
-      </div>
-    </div>
-  </div>`;
-}
-
-// ============================================================
-//  STEP 7 post-actions
-// ============================================================
-async function handleStep7(text){
-  const t=text.toLowerCase();
-  if(t.includes('ver')||t.includes('preview')||t.includes('nuevo')){
-    showCVPreview(); return;
+function buildCV(tpl){
+  const d = state.data;
+  if(tpl === 'A'){
+    return '<div class="cv-a">' +
+      '<div class="cv-name">' + escHtml(d.nombre) + '</div>' +
+      '<div class="cv-title">' + escHtml(d.titulo) + '</div>' +
+      '<div class="cv-contact"><span>📞 ' + escHtml(d.telefono) + '</span><span>✉️ ' + escHtml(d.email) + '</span><span>📍 ' + escHtml(d.ubicacion) + '</span>' + (d.linkedin ? '<span>🔗 ' + escHtml(d.linkedin) + '</span>' : '') + '</div>' +
+      '<hr class="cv-divider"><div class="cv-section-title">Perfil Profesional</div>' +
+      '<p style="font-size:0.87rem;line-height:1.65;color:#333;">' + escHtml(d.resumenFinal) + '</p>' +
+      '<hr class="cv-divider"><div class="cv-section-title">Experiencia Laboral</div>' + expHtml(d.experiencias, 'cv-a') +
+      '<hr class="cv-divider"><div class="cv-section-title">Educación</div>' + eduHtml(d.educacion, 'cv-a') +
+      '<hr class="cv-divider"><div class="cv-section-title">Competencias Clave</div>' +
+      '<div class="cv-skills-grid">' + skillChips(d.habilidadesFinal, 'cv-skill-chip') + '</div>' +
+    '</div>';
   }
-  if(t.includes('plantilla')||t.includes('cambiar')){
-    state.step=6;
-    await startStep6(); return;
+  if(tpl === 'B'){
+    const allSkills = d.habilidadesFinal.replace(/[A-Za-záéíóúÁÉÍÓÚñÑ\s]+:\s*/g,'').split(/[·,;]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s; });
+    return '<div class="cv-b">' +
+      '<div class="cv-sidebar">' +
+        '<div class="cv-name">' + escHtml(d.nombre) + '</div>' +
+        '<div class="cv-title">' + escHtml(d.titulo) + '</div>' +
+        '<div class="cv-sidebar-section"><div class="cv-sidebar-title">Contacto</div>' +
+          '<div class="cv-contact-item">📞 ' + escHtml(d.telefono) + '</div>' +
+          '<div class="cv-contact-item">✉️ ' + escHtml(d.email) + '</div>' +
+          '<div class="cv-contact-item">📍 ' + escHtml(d.ubicacion) + '</div>' +
+          (d.linkedin ? '<div class="cv-contact-item">🔗 ' + escHtml(d.linkedin) + '</div>' : '') +
+        '</div>' +
+        '<div class="cv-sidebar-section"><div class="cv-sidebar-title">Habilidades</div>' +
+          allSkills.map(function(s){ return '<div class="cv-skill-item">' + escHtml(s) + '</div>'; }).join('') +
+        '</div>' +
+      '</div>' +
+      '<div class="cv-main">' +
+        '<div class="cv-main-section"><div class="cv-section-title">Perfil Profesional</div><p class="cv-summary">' + escHtml(d.resumenFinal) + '</p></div>' +
+        '<div class="cv-main-section"><div class="cv-section-title">Experiencia Laboral</div>' + expHtml(d.experiencias, 'cv-b') + '</div>' +
+        '<div class="cv-main-section"><div class="cv-section-title">Educación</div>' + eduHtml(d.educacion, 'cv-b') + '</div>' +
+      '</div>' +
+    '</div>';
   }
-  if(t.includes('edicion')||t.includes('edición')||t.includes('editar')||t.includes('cambio')){
-    await botTyping('Claro, ¿qué sección quieres editar? (nombre, perfil, experiencia, educación, habilidades)');
-    return;
-  }
-  updateProgress();
-  await botTyping('Ensamblando tu CV profesional optimizado para ATS...', 1600);
-  await sleep(800);
-  showCVPreview();
+  // C
+  return '<div class="cv-c">' +
+    '<div class="cv-header-band">' +
+      '<div class="cv-name">' + escHtml(d.nombre) + '</div>' +
+      '<div class="cv-title">' + escHtml(d.titulo) + '</div>' +
+      '<div class="cv-contact"><span>📞 ' + escHtml(d.telefono) + '</span><span>✉️ ' + escHtml(d.email) + '</span><span>📍 ' + escHtml(d.ubicacion) + '</span>' + (d.linkedin ? '<span>🔗 ' + escHtml(d.linkedin) + '</span>' : '') + '</div>' +
+    '</div>' +
+    '<div class="cv-body">' +
+      '<div class="cv-section"><div class="cv-section-title">Perfil Profesional</div><p class="cv-summary">' + escHtml(d.resumenFinal) + '</p></div>' +
+      '<div class="cv-section"><div class="cv-section-title">Experiencia Laboral</div>' + expHtml(d.experiencias, 'cv-c') + '</div>' +
+      '<div class="cv-section"><div class="cv-section-title">Educación</div>' + eduHtml(d.educacion, 'cv-c') + '</div>' +
+      '<div class="cv-section"><div class="cv-section-title">Competencias Clave</div><div class="cv-skills-grid">' + skillChips(d.habilidadesFinal, 'cv-skill-chip') + '</div></div>' +
+    '</div>' +
+  '</div>';
 }
 
 // ============================================================
 //  INIT
 // ============================================================
 async function init(){
-  await sleep(400);
-  await botTyping(`
-    <div class="section-tag">Bienvenido · Paso 1 de 7</div>
-    ¡Hola! Soy tu asistente de CV profesional. Juntos vamos a crear un curriculum <strong>optimizado para sistemas ATS</strong> que destaque ante los reclutadores.<br><br>
-    Empecemos con lo básico. Por favor compárteme:<br><br>
-    <ul>
-      <li><strong>Nombre completo</strong></li>
-      <li><strong>Ubicación</strong> (ciudad y estado/país)</li>
-      <li><strong>Título profesional / puesto objetivo</strong></li>
-      <li><strong>Teléfono</strong></li>
-      <li><strong>LinkedIn</strong> (opcional)</li>
-      <li><strong>Correo electrónico profesional</strong></li>
-    </ul>
-    <span class="tip">Puedes escribirlos todos de una vez o ir uno por uno, como prefieras.</span>
-  `, 600);
+  await sleep(500);
+  await botTyping(
+    '<div class="section-tag">Bienvenido · Paso 1 de 7</div>' +
+    '¡Hola! Soy tu asistente de CV profesional. Juntos vamos a crear un currículum <strong>optimizado para sistemas ATS</strong> que destaque ante los reclutadores.<br><br>' +
+    'Empecemos con lo básico. ¿Cuál es tu <strong>nombre completo</strong>?',
+    600
+  );
 }
 
 init();
