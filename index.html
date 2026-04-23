@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Constructor de CV Profesional</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -23,32 +26,79 @@
     }
 
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: linear-gradient(135deg, #1e3a5f 0%, #2e86de 100%);
+      font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(145deg, #0a1f3c 0%, #1e3a5f 40%, #1a6fb5 100%);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
       padding: 20px;
+      position: relative;
+      overflow-x: hidden;
     }
+
+    /* ── FONDO DECORATIVO ── */
+    .bg-deco {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .bg-deco span {
+      position: absolute;
+      display: block;
+      opacity: 0.06;
+      animation: floatUp linear infinite;
+      font-size: 3rem;
+      user-select: none;
+    }
+    @keyframes floatUp {
+      0%   { transform: translateY(110vh) rotate(0deg);   opacity: 0; }
+      10%  { opacity: 0.07; }
+      90%  { opacity: 0.07; }
+      100% { transform: translateY(-10vh) rotate(20deg);  opacity: 0; }
+    }
+
+    .header, .progress-wrap, .chat-container, .cv-preview-overlay { position: relative; z-index: 1; }
 
     /* HEADER */
     .header {
       text-align: center;
       color: white;
-      margin-bottom: 20px;
-      padding-top: 10px;
+      margin-bottom: 22px;
+      padding-top: 14px;
+    }
+    .header .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: #90caf9;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 10px;
     }
     .header h1 {
-      font-size: 1.8rem;
-      font-weight: 700;
-      letter-spacing: -0.5px;
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1.1;
+      background: linear-gradient(90deg, #fff 0%, #90caf9 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
     .header p {
-      font-size: 0.95rem;
-      opacity: 0.85;
-      margin-top: 4px;
+      font-size: 0.9rem;
+      opacity: 0.75;
+      margin-top: 6px;
+      font-weight: 400;
+      letter-spacing: 0.3px;
     }
 
     /* PROGRESS BAR */
@@ -504,9 +554,13 @@
 </head>
 <body>
 
+<!-- FONDO DECORATIVO -->
+<div class="bg-deco" aria-hidden="true" id="bgDeco"></div>
+
 <div class="header">
+  <div class="badge">✦ Inteligencia Artificial ✦</div>
   <h1>Constructor de CV Profesional</h1>
-  <p>Optimizado para ATS · Guiado paso a paso</p>
+  <p>Optimizado para ATS &nbsp;·&nbsp; Guiado paso a paso &nbsp;·&nbsp; Descarga en PDF</p>
 </div>
 
 <!-- PROGRESS -->
@@ -547,8 +601,9 @@
     <div class="cv-modal-body" id="cvPreviewBody"></div>
     <div class="cv-modal-footer">
       <button class="btn btn-success" onclick="downloadPDF()">⬇ Descargar PDF</button>
+      <button class="btn btn-primary" onclick="closePreview(); setTimeout(()=>{ state.mode='p7_edit'; document.getElementById('userInput').focus(); botTyping('<div class=\'section-tag\'>✨ Editar con IA</div>Dime qué quieres cambiar y lo actualizo al instante.<br><span class=\'tip\'>Ej: &quot;Cambia el título a Gerente de Proyectos&quot; · &quot;Agrega Excel a mis habilidades&quot;</span>'); },300)">✨ Editar con IA</button>
       <button class="btn btn-secondary" onclick="changeTemplate()">🔄 Cambiar Plantilla</button>
-      <button class="btn btn-secondary" onclick="closePreview()">✏ Editar</button>
+      <button class="btn btn-secondary" onclick="closePreview()">✕ Cerrar</button>
     </div>
   </div>
 </div>
@@ -560,7 +615,7 @@
 const state = {
   mode: 'p1_nombre',   // current waiting mode
   data: {
-    nombre:'', ubicacion:'', titulo:'', telefono:'', linkedin:'', email:'',
+    nombre:'', ubicacion:'', titulo:'', telefono:'', email:'',
     resumenFinal:'',
     experiencias:[],
     educacion:[],
@@ -598,13 +653,13 @@ function formatBullets(text){
 }
 
 const STEP_MAP = {
-  p1_nombre:1, p1_ubicacion:1, p1_titulo:1, p1_telefono:1, p1_linkedin:1, p1_email:1, p1_confirm:1, p1_fix:1,
+  p1_nombre:1, p1_ubicacion:1, p1_titulo:1, p1_telefono:1, p1_email:1, p1_confirm:1, p1_fix:1,
   p2_raw:2, p2_confirm:2, p2_edit:2,
   p3_empresa:3, p3_puesto:3, p3_inicio:3, p3_fin:3, p3_desc:3, p3_confirm:3, p3_edit:3, p3_more:3,
   p4_grado:4, p4_institucion:4, p4_anios:4, p4_ubicacion:4, p4_more:4,
   p5_raw:5, p5_confirm:5, p5_edit:5, p5_logros:5,
   p6_plantilla:6,
-  p7_done:7
+  p7_done:7, p7_edit:7
 };
 
 function updateProgress(){
@@ -723,11 +778,6 @@ async function handleInput(text){
 
   } else if(state.mode === 'p1_telefono'){
     state.data.telefono = text;
-    state.mode = 'p1_linkedin';
-    await botTyping('¿Tienes una <strong>URL de LinkedIn</strong>? (escribe "omitir" si no tienes o no quieres incluirla)');
-
-  } else if(state.mode === 'p1_linkedin'){
-    state.data.linkedin = (t === 'omitir' || t === 'no') ? '' : text;
     state.mode = 'p1_email';
     await botTyping('¿Cuál es tu <strong>correo electrónico profesional</strong>?');
 
@@ -742,7 +792,6 @@ async function handleInput(text){
       '📍 <strong>Ubicación:</strong> ' + escHtml(d.ubicacion) + '<br>' +
       '💼 <strong>Título objetivo:</strong> ' + escHtml(d.titulo) + '<br>' +
       '📞 <strong>Teléfono:</strong> ' + escHtml(d.telefono) + '<br>' +
-      '🔗 <strong>LinkedIn:</strong> ' + (d.linkedin ? escHtml(d.linkedin) : 'No incluido') + '<br>' +
       '✉️ <strong>Correo:</strong> ' + escHtml(d.email) + '<br><br>' +
       '¿Todo correcto? Escribe <strong>"sí"</strong> para continuar o dime qué dato corregir.'
     );
@@ -764,7 +813,7 @@ async function handleInput(text){
       );
     } else {
       state.mode = 'p1_fix';
-      await botTyping('Claro, ¿qué dato necesitas corregir? Escríbelo así:<br><strong>nombre: Juan Pérez</strong> (o email, teléfono, título, linkedin, ubicación)');
+      await botTyping('Claro, ¿qué dato necesitas corregir? Escríbelo así:<br><strong>nombre: Juan Pérez</strong> (o email, teléfono, título, ubicación)');
     }
 
   } else if(state.mode === 'p1_fix'){
@@ -776,7 +825,7 @@ async function handleInput(text){
       else if(key.includes('email') || key.includes('correo')) state.data.email = val;
       else if(key.includes('tel')) state.data.telefono = val;
       else if(key.includes('titul')) state.data.titulo = val;
-      else if(key.includes('linked')) state.data.linkedin = val;
+
       else if(key.includes('ubica')) state.data.ubicacion = val;
     }
     state.mode = 'p1_confirm';
@@ -1034,14 +1083,77 @@ async function handleInput(text){
   } else if(state.mode === 'p7_done'){
     if(t.includes('ver') || t.includes('preview')){
       showCVPreview();
-    } else if(t.includes('plantilla') || t.includes('cambiar')){
+    } else if(t.includes('plantilla') || t.includes('cambiar plantilla')){
       state.mode = 'p6_plantilla';
       await botTyping('¿Qué plantilla prefieres ahora? (A, B o C)');
       setChips(['A — Ejecutivo Clásico', 'B — Moderno Dividido', 'C — Minimalista Bold']);
+    } else if(t.includes('ia') || t.includes('editar') || t.includes('cambiar') || t.includes('modificar')){
+      state.mode = 'p7_edit';
+      await botTyping(
+        '<div class="section-tag">✨ Editar con IA</div>' +
+        'Dime qué quieres cambiar en tu CV y lo actualizo al instante.<br><br>' +
+        '<span class="tip">Ejemplos: "Cambia mi título a Gerente de Proyectos" · "El nombre de la empresa debe ser Grupo XYZ" · "Agrega Python a mis habilidades" · "El puesto debe decir Ingeniero en Logística"</span>'
+      );
     } else {
       showCVPreview();
     }
+
+  } else if(state.mode === 'p7_edit'){
+    const cambio = aplicarCambioIA(text);
+    await botTyping(
+      '<div class="section-tag">✓ Cambio aplicado</div>' +
+      cambio + '<br><br>' +
+      '¿Quieres hacer otro cambio o ver el CV actualizado?',
+      700
+    );
+    setChips(['Ver CV actualizado', 'Hacer otro cambio', 'Cambiar plantilla']);
+    state.mode = 'p7_done';
   }
+}
+
+// ============================================================
+//  AI EDITOR
+// ============================================================
+function aplicarCambioIA(instruccion){
+  const t = instruccion.toLowerCase();
+  const d = state.data;
+
+  // Título profesional
+  if(t.includes('título') || t.includes('titulo') || t.includes('puesto') || t.includes('cargo')){
+    const m = instruccion.match(/(?:a|sea|debe(?:\s+ser)?|por|como)\s+(.+)$/i);
+    if(m){ d.titulo = capitalizar(m[1].trim()); return 'Título actualizado a: <strong>' + escHtml(d.titulo) + '</strong>'; }
+  }
+  // Nombre
+  if(t.includes('nombre')){
+    const m = instruccion.match(/(?:a|sea|debe(?:\s+ser)?|es|por)\s+(.+)$/i);
+    if(m){ d.nombre = capitalizar(m[1].trim()); return 'Nombre actualizado a: <strong>' + escHtml(d.nombre) + '</strong>'; }
+  }
+  // Empresa (última experiencia)
+  if(t.includes('empresa') || t.includes('compañía') || t.includes('compania')){
+    const m = instruccion.match(/(?:a|sea|debe(?:\s+ser)?|es|por|llama(?:rse)?)\s+(.+)$/i);
+    if(m && d.experiencias.length){ d.experiencias[0].empresa = capitalizar(m[1].trim()); return 'Empresa actualizada a: <strong>' + escHtml(d.experiencias[0].empresa) + '</strong>'; }
+  }
+  // Habilidades — agregar
+  if(t.includes('agrega') || t.includes('añade') || t.includes('incluye')){
+    const skill = instruccion.replace(/agrega|añade|incluye|agregar|añadir|incluir/gi,'').replace(/(?:a mis|en mis|mis)?\s*(?:habilidades|competencias|skills)/gi,'').trim();
+    if(skill){ d.habilidades.push(capitalizar(skill)); return 'Agregado a habilidades: <strong>' + escHtml(capitalizar(skill)) + '</strong>'; }
+  }
+  // Email
+  if(t.includes('correo') || t.includes('email')){
+    const m = instruccion.match(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i);
+    if(m){ d.email = m[0]; return 'Correo actualizado a: <strong>' + escHtml(d.email) + '</strong>'; }
+  }
+  // Teléfono
+  if(t.includes('teléfono') || t.includes('telefono') || t.includes('número') || t.includes('numero')){
+    const m = instruccion.match(/[\d\s\-\+\(\)]{7,}/);
+    if(m){ d.telefono = m[0].trim(); return 'Teléfono actualizado a: <strong>' + escHtml(d.telefono) + '</strong>'; }
+  }
+  // Perfil/resumen
+  if(t.includes('perfil') || t.includes('resumen') || t.includes('descripción') || t.includes('descripcion')){
+    const m = instruccion.match(/(?:a|sea|diga|que diga|por)\s*[":']?(.+)[":']?$/i);
+    if(m){ d.resumenFinal = capitalizar(m[1].trim()); return 'Perfil profesional actualizado.'; }
+  }
+  return 'Cambio aplicado en el CV. Revísalo en la vista previa.';
 }
 
 // ============================================================
@@ -1090,13 +1202,10 @@ function closePreview(){
   document.getElementById('cvOverlay').classList.remove('open');
   state.mode = 'p7_done';
   botTyping(
-    '<div class="section-tag">Tu CV está listo 🎉</div>' +
-    'Opciones:<br>' +
-    '<strong>(a)</strong> Ver CV de nuevo<br>' +
-    '<strong>(b)</strong> Cambiar plantilla<br>' +
-    '<strong>(c)</strong> Descargar PDF desde la vista previa'
+    '<div class="section-tag">Tu CV está listo</div>' +
+    '¿Qué deseas hacer ahora?'
   );
-  setChips(['Ver CV de nuevo', 'Cambiar plantilla']);
+  setChips(['Ver CV de nuevo', '✨ Editar con IA', 'Cambiar plantilla']);
 }
 
 function changeTemplate(){
@@ -1108,22 +1217,38 @@ function changeTemplate(){
   }, 200);
 }
 
-function downloadPDF(){
-  const el = document.getElementById('cvPreviewBody');
-  const pri = window.open('', '_blank', 'width=900,height=700');
-  if(!pri){ alert('Permite ventanas emergentes para descargar el PDF.'); return; }
-  let css = '';
+async function downloadPDF(){
+  const btn = document.querySelector('.btn-success');
+  const orig = btn ? btn.textContent : '';
+  if(btn){ btn.textContent = 'Generando PDF...'; btn.disabled = true; }
+
   try {
-    for(const sheet of document.styleSheets){
-      for(const rule of sheet.cssRules){ css += rule.cssText; }
+    const el = document.getElementById('cvPreviewBody');
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const ratio = canvas.height / canvas.width;
+    const imgH = pageW * ratio;
+
+    if(imgH <= pageH){
+      pdf.addImage(imgData, 'PNG', 0, 0, pageW, imgH);
+    } else {
+      let y = 0;
+      while(y < imgH){
+        pdf.addImage(imgData, 'PNG', 0, -y, pageW, imgH);
+        y += pageH;
+        if(y < imgH) pdf.addPage();
+      }
     }
-  } catch(e){}
-  pri.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>CV - ' + escHtml(state.data.nombre) + '</title><style>body{margin:0;padding:0;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}' + css + '</style></head><body>');
-  pri.document.write(el.innerHTML);
-  pri.document.write('</body></html>');
-  pri.document.close();
-  pri.focus();
-  setTimeout(function(){ pri.print(); }, 600);
+    pdf.save('CV_' + state.data.nombre.replace(/\s+/g,'-') + '.pdf');
+  } catch(e){
+    alert('Error al generar PDF. Intenta de nuevo.');
+  }
+
+  if(btn){ btn.textContent = orig; btn.disabled = false; }
 }
 
 // ============================================================
@@ -1183,7 +1308,7 @@ function buildCV(tpl){
     return '<div class="cv-a">' +
       '<div class="cv-name">' + escHtml(capitalizar(d.nombre)) + '</div>' +
       '<div class="cv-title">' + escHtml(capitalizar(d.titulo)) + '</div>' +
-      '<div class="cv-contact"><span>📞 ' + escHtml(d.telefono) + '</span><span>✉️ ' + escHtml(d.email) + '</span><span>📍 ' + escHtml(capitalizar(d.ubicacion)) + '</span>' + (d.linkedin ? '<span>🔗 ' + escHtml(d.linkedin) + '</span>' : '') + '</div>' +
+      '<div class="cv-contact"><span>📞 ' + escHtml(d.telefono) + '</span><span>✉️ ' + escHtml(d.email) + '</span><span>📍 ' + escHtml(capitalizar(d.ubicacion)) + '</span>' + '' + '</div>' +
       '<hr class="cv-divider"><div class="cv-section-title">Perfil Profesional</div>' +
       '<p style="font-size:0.87rem;line-height:1.65;color:#333;">' + escHtml(d.resumenFinal) + '</p>' +
       '<hr class="cv-divider"><div class="cv-section-title">Experiencia Laboral</div>' + expHtml(d.experiencias, 'cv-a') +
@@ -1201,7 +1326,7 @@ function buildCV(tpl){
           '<div class="cv-contact-item">📞 ' + escHtml(d.telefono) + '</div>' +
           '<div class="cv-contact-item">✉️ ' + escHtml(d.email) + '</div>' +
           '<div class="cv-contact-item">📍 ' + escHtml(capitalizar(d.ubicacion)) + '</div>' +
-          (d.linkedin ? '<div class="cv-contact-item">🔗 ' + escHtml(d.linkedin) + '</div>' : '') +
+          '' +
         '</div>' +
         (d.habilidades.length ? '<div class="cv-sidebar-section"><div class="cv-sidebar-title">Habilidades</div>' + d.habilidades.map(function(s){ return '<div class="cv-skill-item">' + escHtml(s) + '</div>'; }).join('') + '</div>' : '') +
         (d.competencias.length ? '<div class="cv-sidebar-section"><div class="cv-sidebar-title">Competencias</div>' + d.competencias.map(function(s){ return '<div class="cv-skill-item">' + escHtml(s) + '</div>'; }).join('') + '</div>' : '') +
@@ -1221,7 +1346,7 @@ function buildCV(tpl){
     '<div class="cv-header-band">' +
       '<div class="cv-name">' + escHtml(capitalizar(d.nombre)) + '</div>' +
       '<div class="cv-title">' + escHtml(capitalizar(d.titulo)) + '</div>' +
-      '<div class="cv-contact"><span>📞 ' + escHtml(d.telefono) + '</span><span>✉️ ' + escHtml(d.email) + '</span><span>📍 ' + escHtml(capitalizar(d.ubicacion)) + '</span>' + (d.linkedin ? '<span>🔗 ' + escHtml(d.linkedin) + '</span>' : '') + '</div>' +
+      '<div class="cv-contact"><span>📞 ' + escHtml(d.telefono) + '</span><span>✉️ ' + escHtml(d.email) + '</span><span>📍 ' + escHtml(capitalizar(d.ubicacion)) + '</span>' + '' + '</div>' +
     '</div>' +
     '<div class="cv-body">' +
       '<div class="cv-section"><div class="cv-section-title">Perfil Profesional</div><p class="cv-summary">' + escHtml(d.resumenFinal) + '</p></div>' +
@@ -1231,6 +1356,24 @@ function buildCV(tpl){
     '</div>' +
   '</div>';
 }
+
+// ============================================================
+//  FONDO DECORATIVO
+// ============================================================
+(function(){
+  const icons = ['📄','💼','✦','🏆','📊','⭐','📝','🎯','💡','📈'];
+  const wrap = document.getElementById('bgDeco');
+  for(let i = 0; i < 22; i++){
+    const s = document.createElement('span');
+    s.textContent = icons[i % icons.length];
+    s.style.left = (Math.random() * 100) + 'vw';
+    s.style.top = (Math.random() * 100) + 'vh';
+    s.style.fontSize = (1.8 + Math.random() * 3) + 'rem';
+    s.style.animationDuration = (18 + Math.random() * 22) + 's';
+    s.style.animationDelay = -(Math.random() * 20) + 's';
+    wrap.appendChild(s);
+  }
+})();
 
 // ============================================================
 //  INIT
