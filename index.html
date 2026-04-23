@@ -378,7 +378,7 @@
     .cv-a .cv-job-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
     .cv-a .cv-company { font-weight: 700; font-size: 0.95rem; }
     .cv-a .cv-dates { font-size: 0.8rem; color: #666; }
-    .cv-a .cv-role { font-style: italic; font-size: 0.88rem; color: #2e86de; margin-bottom: 6px; }
+    .cv-a .cv-role { font-style: italic; font-size: 0.92rem; color: #1e3a5f; font-weight: 700; margin-bottom: 6px; }
     .cv-a ul { padding-left: 18px; }
     .cv-a ul li { font-size: 0.87rem; margin-bottom: 4px; line-height: 1.5; }
     .cv-a .cv-skills-grid { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -444,7 +444,7 @@
     .cv-b .cv-job-header { display: flex; justify-content: space-between; }
     .cv-b .cv-company { font-weight: 700; font-size: 0.92rem; color: #1e3a5f; }
     .cv-b .cv-dates { font-size: 0.78rem; color: #718096; }
-    .cv-b .cv-role { font-size: 0.83rem; color: #2e86de; margin-bottom: 6px; }
+    .cv-b .cv-role { font-size: 0.88rem; color: #1e3a5f; font-weight: 700; margin-bottom: 6px; }
     .cv-b ul { padding-left: 16px; }
     .cv-b ul li { font-size: 0.84rem; margin-bottom: 4px; line-height: 1.5; color: #2d3748; }
     .cv-b .cv-edu-line { font-size: 0.86rem; margin-bottom: 3px; color: #2d3748; }
@@ -486,7 +486,7 @@
     .cv-c .cv-job-header { display: flex; justify-content: space-between; margin-bottom: 2px; }
     .cv-c .cv-company { font-weight: 700; font-size: 0.95rem; color: #1a1a2e; }
     .cv-c .cv-dates { font-size: 0.8rem; color: #718096; font-weight: 600; }
-    .cv-c .cv-role { font-size: 0.85rem; color: #2e86de; font-weight: 600; margin-bottom: 7px; }
+    .cv-c .cv-role { font-size: 0.9rem; color: #1e3a5f; font-weight: 800; margin-bottom: 7px; }
     .cv-c ul { padding-left: 18px; }
     .cv-c ul li { font-size: 0.87rem; margin-bottom: 4px; line-height: 1.5; }
     .cv-c .cv-summary { font-size: 0.89rem; line-height: 1.65; color: #4a5568; }
@@ -564,7 +564,10 @@ const state = {
     resumenFinal:'',
     experiencias:[],
     educacion:[],
-    habilidadesFinal:'',
+    habilidades:[],
+    competencias:[],
+    idiomas:[],
+    logros:[],
     plantilla:'A'
   },
   currentExp: {},
@@ -581,6 +584,12 @@ function escHtml(t){
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+function capitalizar(t){
+  if(!t) return t;
+  t = t.charAt(0).toUpperCase() + t.slice(1);
+  return t.replace(/([.!?]\s+)([a-záéíóúñü])/gi, function(m, sep, c){ return sep + c.toUpperCase(); });
+}
+
 function formatBullets(text){
   return text.split('\n')
     .map(l=>l.trim()).filter(l=>l)
@@ -593,7 +602,7 @@ const STEP_MAP = {
   p2_raw:2, p2_confirm:2, p2_edit:2,
   p3_empresa:3, p3_puesto:3, p3_inicio:3, p3_fin:3, p3_desc:3, p3_confirm:3, p3_edit:3, p3_more:3,
   p4_grado:4, p4_institucion:4, p4_anios:4, p4_ubicacion:4, p4_more:4,
-  p5_raw:5, p5_confirm:5, p5_edit:5,
+  p5_raw:5, p5_confirm:5, p5_edit:5, p5_logros:5,
   p6_plantilla:6,
   p7_done:7
 };
@@ -950,42 +959,53 @@ async function handleInput(text){
 
   // ── PASO 5: HABILIDADES ───────────────────────────────────
   } else if(state.mode === 'p5_raw'){
-    const skills = organizarHabilidades(text);
-    state.data.habilidadesFinal = skills;
+    organizarHabilidades(text);
+    const preview =
+      (state.data.habilidades.length  ? '<strong>Habilidades:</strong> ' + state.data.habilidades.join(', ') + '<br>' : '') +
+      (state.data.competencias.length ? '<strong>Competencias:</strong> ' + state.data.competencias.join(', ') + '<br>' : '') +
+      (state.data.idiomas.length      ? '<strong>Idiomas:</strong> ' + state.data.idiomas.join(', ') + '<br>' : '');
     state.mode = 'p5_confirm';
     await botTyping(
       '<div class="section-tag">Habilidades Organizadas</div>' +
-      escHtml(skills).replace(/\n/g, '<br>') + '<br><br>' +
-      '¿Te parece bien esta organización? Escribe <strong>"sí"</strong> para confirmar.',
+      preview + '<br>' +
+      '¿Te parece bien? Escribe <strong>"sí"</strong> para confirmar o dime qué cambiar.',
       1000
     );
     setChips(['Sí, confirmar', 'Modificar']);
 
   } else if(state.mode === 'p5_confirm'){
     if(yes){
-      state.mode = 'p6_plantilla';
+      state.mode = 'p5_logros';
       await botTyping(
-        '<div class="section-tag">Paso 6 — Elige tu Plantilla</div>' +
-        'Tenemos 3 diseños. Escoge el que mejor refleje tu perfil:<br><br>' +
-        '<strong>🅐 Ejecutivo Clásico</strong> — Columna única, paleta azul marino. Ideal para roles corporativos y senior.<br><br>' +
-        '<strong>🅑 Moderno Dividido</strong> — Dos columnas con barra lateral oscura. Ideal para tecnología y logística.<br><br>' +
-        '<strong>🅒 Minimalista Bold</strong> — Franja de color en header. Ideal para roles creativos y comerciales.<br><br>' +
-        '¿Cuál prefieres? (A, B o C)',
-        900
+        '<div class="section-tag">Logros Destacados</div>' +
+        'Ahora dime tus <strong>principales logros profesionales</strong> (uno por línea o separados por comas).<br><br>' +
+        '<span class="tip">Ej: "Reduje costos operativos en 30%, Lideré equipo de 15 personas, Incrementé ventas 40% en 6 meses"</span>'
       );
-      setChips(['A — Ejecutivo Clásico', 'B — Moderno Dividido', 'C — Minimalista Bold']);
     } else {
       state.mode = 'p5_edit';
-      await botTyping('Escríbeme las habilidades exactamente como quieres que queden.');
+      await botTyping('Escríbeme las habilidades corregidas (separadas por comas) y yo las reorganizo.');
     }
 
   } else if(state.mode === 'p5_edit'){
-    state.data.habilidadesFinal = text;
-    state.mode = 'p6_plantilla';
+    organizarHabilidades(text);
+    state.mode = 'p5_logros';
     await botTyping(
       '<div class="section-tag">Habilidades actualizadas ✓</div>' +
-      'Habilidades guardadas. Ahora elige tu plantilla:<br><br>' +
-      '<strong>A</strong> — Ejecutivo Clásico &nbsp;|&nbsp; <strong>B</strong> — Moderno Dividido &nbsp;|&nbsp; <strong>C</strong> — Minimalista Bold'
+      'Ahora dime tus <strong>principales logros profesionales</strong> (uno por línea o separados por comas).<br>' +
+      '<span class="tip">Ej: "Reduje costos 30%, Lancé producto con ventas de $500k"</span>'
+    );
+
+  } else if(state.mode === 'p5_logros'){
+    state.data.logros = text.split(/[,\n;]+/).map(function(s){ return capitalizar(s.trim()); }).filter(function(s){ return s; });
+    state.mode = 'p6_plantilla';
+    await botTyping(
+      '<div class="section-tag">Logros guardados ✓</div>' +
+      'Perfecto. Ahora elige tu plantilla:<br><br>' +
+      '<strong>🅐 Ejecutivo Clásico</strong> — Columna única, paleta azul marino. Ideal para roles corporativos y senior.<br><br>' +
+      '<strong>🅑 Moderno Dividido</strong> — Dos columnas con barra lateral oscura. Ideal para tecnología y logística.<br><br>' +
+      '<strong>🅒 Minimalista Bold</strong> — Franja de color en header. Ideal para roles creativos y comerciales.<br><br>' +
+      '¿Cuál prefieres? (A, B o C)',
+      900
     );
     setChips(['A — Ejecutivo Clásico', 'B — Moderno Dividido', 'C — Minimalista Bold']);
 
@@ -1029,12 +1049,13 @@ async function handleInput(text){
 // ============================================================
 function generarResumen(raw, titulo){
   const yrs = raw.match(/(\d+)\s*a[ñn]/i);
-  const yrStr = yrs ? yrs[1] + ' años de experiencia' : 'amplia experiencia';
-  return 'Profesional con ' + yrStr + ' en el área de ' + titulo + ', con sólida trayectoria en la gestión de proyectos, optimización de procesos y generación de resultados medibles. Destaca por su capacidad analítica, liderazgo de equipos multidisciplinarios y orientación estratégica alineada a los objetivos organizacionales. Reconocido por su habilidad para implementar soluciones innovadoras que incrementan la eficiencia operativa y la rentabilidad del negocio. Busca contribuir su experiencia y competencias en un rol que potencie el crecimiento sostenible de la organización.';
+  const yrStr = yrs ? yrs[1] + ' años de experiencia' : 'Amplia experiencia';
+  return capitalizar('Profesional con ' + yrStr + ' en el área de ' + titulo + ', con sólida trayectoria en la gestión de proyectos, optimización de procesos y generación de resultados medibles. Destaca por su capacidad analítica, liderazgo de equipos multidisciplinarios y orientación estratégica alineada a los objetivos organizacionales. Reconocido por su habilidad para implementar soluciones innovadoras que incrementan la eficiencia operativa y la rentabilidad del negocio. Busca contribuir su experiencia y competencias en un rol que potencie el crecimiento sostenible de la organización.');
 }
 
 function generarBullets(exp){
-  return '• Lideré las operaciones del área de ' + exp.puesto.toLowerCase() + ', optimizando procesos internos y reduciendo tiempos de ciclo en un 20%.\n' +
+  const p = capitalizar(exp.puesto);
+  return '• Lideré las operaciones del área de ' + p + ', optimizando procesos internos y reduciendo tiempos de ciclo en un 20%.\n' +
     '• Implementé metodologías que incrementaron la productividad del equipo en más del 15% en un período de 6 meses.\n' +
     '• Gestioné relaciones con clientes y proveedores clave, manteniendo un índice de satisfacción superior al 90%.\n' +
     '• Coordiné proyectos multidisciplinarios cumpliendo plazos y presupuestos establecidos.\n' +
@@ -1042,21 +1063,19 @@ function generarBullets(exp){
 }
 
 function organizarHabilidades(raw){
-  const items = raw.split(/[,\n;]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s; });
-  const tools = [], soft = [], lang = [];
-  const softKws = ['liderazgo','comunicación','negociación','equipo','gestión','planificación','proactividad','adaptabilidad','creatividad','organización'];
-  const langKws = ['español','inglés','francés','portugués','alemán','chino','árabe','nativo','avanzado','intermedio','básico'];
+  const items = raw.split(/[,\n;]+/).map(function(s){ return capitalizar(s.trim()); }).filter(function(s){ return s; });
+  const tools = [], comp = [], lang = [];
+  const compKws = ['liderazgo','comunicación','negociación','equipo','gestión','planificación','proactividad','adaptabilidad','creatividad','organización','pensamiento','resolución'];
+  const langKws = ['español','inglés','francés','portugués','alemán','chino','árabe','nativo','avanzado','intermedio','básico','bilingüe'];
   items.forEach(function(i){
     const il = i.toLowerCase();
     if(langKws.some(function(k){ return il.includes(k); })) lang.push(i);
-    else if(softKws.some(function(k){ return il.includes(k); })) soft.push(i);
+    else if(compKws.some(function(k){ return il.includes(k); })) comp.push(i);
     else tools.push(i);
   });
-  const out = [];
-  if(tools.length) out.push('Herramientas y Tecnologías: ' + tools.join(' · '));
-  if(soft.length) out.push('Competencias Blandas: ' + soft.join(' · '));
-  if(lang.length) out.push('Idiomas: ' + lang.join(' · '));
-  return out.length ? out.join('\n') : raw;
+  state.data.habilidades = tools;
+  state.data.competencias = comp;
+  state.data.idiomas = lang;
 }
 
 // ============================================================
@@ -1130,61 +1149,85 @@ function eduHtml(edus, cls){
   }).join('');
 }
 
-function skillChips(raw, chipClass){
-  const all = raw.replace(/[A-Za-záéíóúÁÉÍÓÚñÑ\s]+:\s*/g, '').split(/[·,;]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s; });
-  return all.map(function(s){ return '<span class="' + chipClass + '">' + escHtml(s) + '</span>'; }).join('');
+function chipsHtml(arr, chipClass){
+  return arr.map(function(s){ return '<span class="' + chipClass + '">' + escHtml(s) + '</span>'; }).join('');
+}
+
+function logrosHtml(arr, cls){
+  if(!arr || !arr.length) return '';
+  return '<ul>' + arr.map(function(l){ return '<li>' + escHtml(capitalizar(l)) + '</li>'; }).join('') + '</ul>';
+}
+
+function seccionesSkillsA(d){
+  let html = '';
+  if(d.habilidades.length)  html += '<hr class="cv-divider"><div class="cv-section-title">Habilidades Técnicas</div><div class="cv-skills-grid">' + chipsHtml(d.habilidades, 'cv-skill-chip') + '</div>';
+  if(d.competencias.length) html += '<hr class="cv-divider"><div class="cv-section-title">Competencias</div><div class="cv-skills-grid">' + chipsHtml(d.competencias, 'cv-skill-chip') + '</div>';
+  if(d.idiomas.length)      html += '<hr class="cv-divider"><div class="cv-section-title">Idiomas</div><div class="cv-skills-grid">' + chipsHtml(d.idiomas, 'cv-skill-chip') + '</div>';
+  if(d.logros.length)       html += '<hr class="cv-divider"><div class="cv-section-title">Logros Destacados</div>' + logrosHtml(d.logros, 'cv-a');
+  return html;
+}
+
+function seccionesSkillsC(d){
+  let html = '';
+  if(d.habilidades.length)  html += '<div class="cv-section"><div class="cv-section-title">Habilidades Técnicas</div><div class="cv-skills-grid">' + chipsHtml(d.habilidades, 'cv-skill-chip') + '</div></div>';
+  if(d.competencias.length) html += '<div class="cv-section"><div class="cv-section-title">Competencias</div><div class="cv-skills-grid">' + chipsHtml(d.competencias, 'cv-skill-chip') + '</div></div>';
+  if(d.idiomas.length)      html += '<div class="cv-section"><div class="cv-section-title">Idiomas</div><div class="cv-skills-grid">' + chipsHtml(d.idiomas, 'cv-skill-chip') + '</div></div>';
+  if(d.logros.length)       html += '<div class="cv-section"><div class="cv-section-title">Logros Destacados</div>' + logrosHtml(d.logros, 'cv-c') + '</div>';
+  return html;
 }
 
 function buildCV(tpl){
   const d = state.data;
+
   if(tpl === 'A'){
     return '<div class="cv-a">' +
-      '<div class="cv-name">' + escHtml(d.nombre) + '</div>' +
-      '<div class="cv-title">' + escHtml(d.titulo) + '</div>' +
-      '<div class="cv-contact"><span>📞 ' + escHtml(d.telefono) + '</span><span>✉️ ' + escHtml(d.email) + '</span><span>📍 ' + escHtml(d.ubicacion) + '</span>' + (d.linkedin ? '<span>🔗 ' + escHtml(d.linkedin) + '</span>' : '') + '</div>' +
+      '<div class="cv-name">' + escHtml(capitalizar(d.nombre)) + '</div>' +
+      '<div class="cv-title">' + escHtml(capitalizar(d.titulo)) + '</div>' +
+      '<div class="cv-contact"><span>📞 ' + escHtml(d.telefono) + '</span><span>✉️ ' + escHtml(d.email) + '</span><span>📍 ' + escHtml(capitalizar(d.ubicacion)) + '</span>' + (d.linkedin ? '<span>🔗 ' + escHtml(d.linkedin) + '</span>' : '') + '</div>' +
       '<hr class="cv-divider"><div class="cv-section-title">Perfil Profesional</div>' +
       '<p style="font-size:0.87rem;line-height:1.65;color:#333;">' + escHtml(d.resumenFinal) + '</p>' +
       '<hr class="cv-divider"><div class="cv-section-title">Experiencia Laboral</div>' + expHtml(d.experiencias, 'cv-a') +
       '<hr class="cv-divider"><div class="cv-section-title">Educación</div>' + eduHtml(d.educacion, 'cv-a') +
-      '<hr class="cv-divider"><div class="cv-section-title">Competencias Clave</div>' +
-      '<div class="cv-skills-grid">' + skillChips(d.habilidadesFinal, 'cv-skill-chip') + '</div>' +
+      seccionesSkillsA(d) +
     '</div>';
   }
+
   if(tpl === 'B'){
-    const allSkills = d.habilidadesFinal.replace(/[A-Za-záéíóúÁÉÍÓÚñÑ\s]+:\s*/g,'').split(/[·,;]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s; });
     return '<div class="cv-b">' +
       '<div class="cv-sidebar">' +
-        '<div class="cv-name">' + escHtml(d.nombre) + '</div>' +
-        '<div class="cv-title">' + escHtml(d.titulo) + '</div>' +
+        '<div class="cv-name">' + escHtml(capitalizar(d.nombre)) + '</div>' +
+        '<div class="cv-title">' + escHtml(capitalizar(d.titulo)) + '</div>' +
         '<div class="cv-sidebar-section"><div class="cv-sidebar-title">Contacto</div>' +
           '<div class="cv-contact-item">📞 ' + escHtml(d.telefono) + '</div>' +
           '<div class="cv-contact-item">✉️ ' + escHtml(d.email) + '</div>' +
-          '<div class="cv-contact-item">📍 ' + escHtml(d.ubicacion) + '</div>' +
+          '<div class="cv-contact-item">📍 ' + escHtml(capitalizar(d.ubicacion)) + '</div>' +
           (d.linkedin ? '<div class="cv-contact-item">🔗 ' + escHtml(d.linkedin) + '</div>' : '') +
         '</div>' +
-        '<div class="cv-sidebar-section"><div class="cv-sidebar-title">Habilidades</div>' +
-          allSkills.map(function(s){ return '<div class="cv-skill-item">' + escHtml(s) + '</div>'; }).join('') +
-        '</div>' +
+        (d.habilidades.length ? '<div class="cv-sidebar-section"><div class="cv-sidebar-title">Habilidades</div>' + d.habilidades.map(function(s){ return '<div class="cv-skill-item">' + escHtml(s) + '</div>'; }).join('') + '</div>' : '') +
+        (d.competencias.length ? '<div class="cv-sidebar-section"><div class="cv-sidebar-title">Competencias</div>' + d.competencias.map(function(s){ return '<div class="cv-skill-item">' + escHtml(s) + '</div>'; }).join('') + '</div>' : '') +
+        (d.idiomas.length ? '<div class="cv-sidebar-section"><div class="cv-sidebar-title">Idiomas</div>' + d.idiomas.map(function(s){ return '<div class="cv-skill-item">' + escHtml(s) + '</div>'; }).join('') + '</div>' : '') +
       '</div>' +
       '<div class="cv-main">' +
         '<div class="cv-main-section"><div class="cv-section-title">Perfil Profesional</div><p class="cv-summary">' + escHtml(d.resumenFinal) + '</p></div>' +
         '<div class="cv-main-section"><div class="cv-section-title">Experiencia Laboral</div>' + expHtml(d.experiencias, 'cv-b') + '</div>' +
         '<div class="cv-main-section"><div class="cv-section-title">Educación</div>' + eduHtml(d.educacion, 'cv-b') + '</div>' +
+        (d.logros.length ? '<div class="cv-main-section"><div class="cv-section-title">Logros Destacados</div>' + logrosHtml(d.logros, 'cv-b') + '</div>' : '') +
       '</div>' +
     '</div>';
   }
-  // C
+
+  // Plantilla C
   return '<div class="cv-c">' +
     '<div class="cv-header-band">' +
-      '<div class="cv-name">' + escHtml(d.nombre) + '</div>' +
-      '<div class="cv-title">' + escHtml(d.titulo) + '</div>' +
-      '<div class="cv-contact"><span>📞 ' + escHtml(d.telefono) + '</span><span>✉️ ' + escHtml(d.email) + '</span><span>📍 ' + escHtml(d.ubicacion) + '</span>' + (d.linkedin ? '<span>🔗 ' + escHtml(d.linkedin) + '</span>' : '') + '</div>' +
+      '<div class="cv-name">' + escHtml(capitalizar(d.nombre)) + '</div>' +
+      '<div class="cv-title">' + escHtml(capitalizar(d.titulo)) + '</div>' +
+      '<div class="cv-contact"><span>📞 ' + escHtml(d.telefono) + '</span><span>✉️ ' + escHtml(d.email) + '</span><span>📍 ' + escHtml(capitalizar(d.ubicacion)) + '</span>' + (d.linkedin ? '<span>🔗 ' + escHtml(d.linkedin) + '</span>' : '') + '</div>' +
     '</div>' +
     '<div class="cv-body">' +
       '<div class="cv-section"><div class="cv-section-title">Perfil Profesional</div><p class="cv-summary">' + escHtml(d.resumenFinal) + '</p></div>' +
       '<div class="cv-section"><div class="cv-section-title">Experiencia Laboral</div>' + expHtml(d.experiencias, 'cv-c') + '</div>' +
       '<div class="cv-section"><div class="cv-section-title">Educación</div>' + eduHtml(d.educacion, 'cv-c') + '</div>' +
-      '<div class="cv-section"><div class="cv-section-title">Competencias Clave</div><div class="cv-skills-grid">' + skillChips(d.habilidadesFinal, 'cv-skill-chip') + '</div></div>' +
+      seccionesSkillsC(d) +
     '</div>' +
   '</div>';
 }
